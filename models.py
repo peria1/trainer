@@ -1,0 +1,217 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Oct  8 15:32:52 2019
+
+@author: Bill
+"""
+
+# -*- coding: utf-8 -*-billUti
+"""
+Created on Sun Oct  6 07:32:17 2019
+
+@author: Bill
+
+Can a model learn that each y is the square root of the sum of all the x^2 values? 
+
+"""
+import torch
+import numpy as np
+import torch.utils.data
+from torch import nn
+
+class plain_sum(nn.Module):
+    def __init__(self, npts=None, nbatch=None):
+        super(plain_sum, self).__init__()
+
+        if npts is None:
+            self.npts = 50
+        if nbatch is None:
+            self.nbatch = 128
+        
+        self.L1 = nn.Linear(self.npts,1)
+       
+    def forward(self,x):
+        return torch.squeeze(self.L1(x))
+
+    def get_xy_batch(self):
+        nbatch = self.nbatch
+        npts = self.npts
+        x = np.random.normal(size=(nbatch,npts))
+    
+        x = torch.from_numpy(x)
+        y = torch.sum(x,1).to(torch.float32)
+        
+        x = x.to(torch.float32)
+        
+        return x,y
+   
+
+class quadsum(nn.Module):
+    def __init__(self, npts=None, nbatch=None):  # trying to see if machine can tell that y is the sum over x 
+        super(quadsum, self).__init__()
+
+        if npts is None:
+            npts = 50
+        if nbatch is None:
+            nbatch = 128
+        
+        self.npts = npts
+        self.nbatch = nbatch
+        
+        self.L1 = nn.Linear(npts, 2*npts)
+        self.L2 = nn.Linear(2*npts, 2*npts)
+        self.L3 = nn.Linear(2*npts, npts)
+        
+        self.weight_vector = nn.Linear(npts, 1) # npts is the size of each 1D example
+                
+    def forward(self, x):
+        dataflow = torch.relu(self.L1(x))
+        dataflow = torch.relu(self.L2(dataflow))
+        dataflow = torch.relu(self.L3(dataflow))
+        result = self.weight_vector(dataflow)
+        return torch.squeeze(result)
+       
+    def get_xy_batch(self):
+        nbatch = self.nbatch
+        npts = self.npts
+        xrange = 20.
+        noiseamp = 0.3
+        noise = noiseamp * torch.randn(nbatch)
+        
+        x = torch.from_numpy(np.random.uniform(-xrange,xrange,size=(nbatch,npts))).to(torch.float32)
+        y = torch.sum(x.pow(2),1).pow(0.5)
+#        print('y size is ',y.size())
+    
+        y = y + noise
+        return x,y
+ 
+
+class xycorr(nn.Module):
+    def __init__(self, npts=None, nbatch=None):  # trying to see if machine can tell that y is the sum over x 
+        super(xycorr, self).__init__()
+
+        if npts is None:
+            npts = 50
+        if nbatch is None:
+            nbatch = 128
+        
+        self.npts = npts
+        self.nbatch = nbatch
+        
+        self.L1 = nn.Linear(npts, 2*npts)
+        self.L2 = nn.Linear(2*npts, 2*npts)
+        self.L3 = nn.Linear(2*npts, 2*npts)
+        self.L4 = nn.Linear(2*npts, 2*npts)
+        self.L5 = nn.Linear(2*npts, 2*npts)
+        self.L6 = nn.Linear(2*npts, 2*npts)
+        self.L7 = nn.Linear(2*npts, 2*npts)
+        self.Llast = nn.Linear(2*npts, npts)
+        
+        self.weight_vector = nn.Linear(npts, 1) # npts is the size of each 1D example
+
+    def forward(self, x):
+        dataflow = torch.relu(self.L1(x))
+        dataflow = torch.relu(self.L2(dataflow))
+        dataflow = torch.relu(self.L3(dataflow))
+        dataflow = torch.relu(self.L4(dataflow))
+        dataflow = torch.relu(self.L5(dataflow))
+        dataflow = torch.relu(self.L6(dataflow))
+        dataflow = torch.relu(self.L7(dataflow))
+        dataflow = torch.relu(self.Llast(dataflow))
+        dataflow = torch.squeeze(self.weight_vector(dataflow))
+        result = torch.tanh(dataflow)
+        return result
+       
+    def get_xy_batch(self):
+        nbatch = self.nbatch
+        npts = self.npts
+        
+        assert((npts % 2) == 0)
+        xsize = (nbatch,npts)
+        half = int(npts/2)
+        
+        xrange = 20.0
+        sloperange = 10.0
+        
+        noiseamp = np.random.uniform(low=1.0, high = 10*xrange, size=(nbatch,1))
+        noise = np.random.normal(scale=noiseamp,size=xsize)
+       
+        slope = np.random.uniform(-sloperange,sloperange,size=(nbatch,1))
+        x = np.random.uniform(low=-xrange, high=xrange, size=xsize)
+        x[:,half:] = (x[:,0:half].reshape((nbatch,half))* slope).reshape((nbatch,half))
+        x = x + noise
+        
+        r = np.zeros((nbatch))
+        for i in range(nbatch):
+            r[i] = np.corrcoef(x[i,0:half], y=x[i,half:])[0,1]
+
+        x = torch.from_numpy(x).to(torch.float)
+        r = torch.from_numpy(r).to(torch.float)
+        return x,r
+
+ 
+
+class inner_prod(nn.Module):
+    def __init__(self, npts=None, nbatch=None):  # trying to see if machine can tell that y is the sum over x 
+        super(inner_prod, self).__init__()
+
+        if npts is None:
+            npts = 50
+        if nbatch is None:
+            nbatch = 128
+        
+        self.npts = npts
+        self.nbatch = nbatch
+        width_factor = 2
+#        self.bn1 = nn.BatchNorm1d(npts)
+        self.L1 = nn.Linear(npts, width_factor*npts)
+        self.L2 = nn.Linear(width_factor*npts, width_factor*npts)
+        self.L3 = nn.Linear(width_factor*npts, width_factor*npts)
+        self.L4 = nn.Linear(width_factor*npts, width_factor*npts)
+        self.L5 = nn.Linear(width_factor*npts, width_factor*npts)
+        self.L6 = nn.Linear(width_factor*npts, width_factor*npts)
+        self.L7 = nn.Linear(width_factor*npts, width_factor*npts)
+        self.Llast = nn.Linear(width_factor*npts, npts)
+        
+        self.weight_vector = nn.Linear(npts, 1) # npts is the size of each 1D example
+                
+    def forward(self, x):
+        dataflow = x
+#        dataflow = self.bn1(x)
+        dataflow = torch.relu(self.L1(dataflow))
+        dataflow = torch.relu(self.L2(dataflow))
+        dataflow = torch.relu(self.L3(dataflow))
+        dataflow = torch.relu(self.L4(dataflow))
+        dataflow = torch.relu(self.L5(dataflow))
+        dataflow = torch.relu(self.L6(dataflow))
+        dataflow = torch.relu(self.L7(dataflow))
+        dataflow = torch.relu(self.Llast(dataflow))
+        result = torch.squeeze(self.weight_vector(dataflow))
+        return result
+       
+    def get_xy_batch(self):
+        nbatch = self.nbatch
+        npts = self.npts
+        
+        assert((npts % 2) == 0)
+        xsize = (nbatch,npts)
+        half = int(npts/2)
+        
+        xrange = 20.0
+        sloperange = 10.0
+        
+        noiseamp = np.random.uniform(low=1.0, high = 10*xrange, size=(nbatch,1))
+        noise = np.random.normal(scale=noiseamp,size=xsize)
+       
+        slope = np.random.uniform(-sloperange,sloperange,size=(nbatch,1))
+        x = np.random.uniform(low=-xrange, high=xrange, size=xsize)
+        x[:,half:] = (x[:,0:half].reshape((nbatch,half))* slope).reshape((nbatch,half))
+        x = x + noise
+
+        xdotx = np.sum(x[:,0:half] * x[:,half:], axis=1)
+        x = torch.from_numpy(x).to(torch.float)
+        xdotx = torch.from_numpy(xdotx).to(torch.float)
+        return x,xdotx
+ 
+
+
