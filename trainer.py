@@ -22,7 +22,7 @@ from models import *
 #import trainer_view
 #import sys
 #sys.path.append('C:\\Users\\peria\\Desktop\\work\\Brent Lab\\Boucheron CNNs\\DLDBproject\\')
-from billUtils import kscirc, uichoosefile, date_for_filename, get_slash
+from trainer_utils import kscirc, uichoosefile, date_for_filename, get_slash
 
 class trainer():
     def __init__(self, trainee_class,max_loss=None,reload=False, **kwargs):
@@ -61,7 +61,8 @@ class trainer():
 
         self.optimizer_type = optim.Adam
         self.optimizer = self.optimizer_type(self.model.parameters(), lr=1e-5)
-
+        self.pause = False
+        
         self.iter_per_batch = 10  # not sure what to do with this. Training loop will
                                   #  do this many iterations on each batch, before 
                                   #  running and reporting a test, and grabbing new data. 

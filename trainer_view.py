@@ -8,6 +8,7 @@ Created on Mon Oct 21 06:16:10 2019
 import matplotlib.pyplot as plt
 import trainer as tr
 from models import *
+from trainer_utils import getnum
 
 import asyncio
 
@@ -29,16 +30,35 @@ class trainer_view():
         
     @fire_and_forget
     def call_trainer(self):
+        self.trainer.pause = False
         self.trainer.train()
+
+    def pause_training(self):
+        self.trainer.pause = True
 
     def process_key(self, event): 
         if event.key == 't':
             print('training...')
-            self.trainer.pause = False
             self.call_trainer()  # this is decorated with fire_and_Forget
         elif event.key == 'p':
             print('Paused.')
-            self.trainer.pause = True
+            self.pause_training()
+        elif event.key == 'l':
+            self.pause_training()
+            lrlist = []
+            [lrlist.append(p['lr']) for p in self.trainer.optimizer.param_groups]
+            print('Number of rates to set is',str(len(lrlist)))
+            newlr = []
+            for l in lrlist:
+                print('Learning rate is',l)        
+                nlr = getnum('Please enter new learning rate:',l)
+                newlr.append(nlr)
+            
+            if len(newlr)==len(lrlist):
+                for i,p in enumerate(self.trainer.optimizer.param_groups):
+                    p['lr']=newlr[i]
+            
+            self.call_trainer()
         else:
             print('I dunno from',event.key)
 
