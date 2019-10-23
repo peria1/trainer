@@ -328,3 +328,13 @@ def cdf_compare(*args):
 
 def IDline():
     pass
+
+def getnum():
+    bad = True
+    while bad:
+        try:
+            n = float(input('Type a number: '))
+            bad = False
+        except ValueError:
+            pass
+    return n
