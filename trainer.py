@@ -19,13 +19,14 @@ from torch import nn, optim
 #from torchvision.utils import save_image
 #import time
 from models import *
-
-import sys
-sys.path.append('C:\\Users\\peria\\Desktop\\work\\Brent Lab\\Boucheron CNNs\\DLDBproject\\')
-from billUtils import kscirc, uichoosefile, date_for_filename
+import trainer_view
+#import sys
+#sys.path.append('C:\\Users\\peria\\Desktop\\work\\Brent Lab\\Boucheron CNNs\\DLDBproject\\')
+from billUtils import kscirc, uichoosefile, date_for_filename, get_slash
 
 class trainer():
-    def __init__(self, trainee_class,max_loss=None,reload=False, **kwargs):
+    def __init__(self, trainee_class,max_loss=None,reload=False, \
+                 controller=None, **kwargs):
         #
         # Given the name of a trainee class, trainer.__init__ will instantiate that 
         #  class and get set up to train that instance. 
@@ -41,7 +42,14 @@ class trainer():
         self.model = trainee # a trainee needs an optimzer and a criterion, 
                                            #   as well as a way to generate data.
                    
-        
+        if controller:
+            controller.pause = False
+        else:
+            class BogusController():
+                def __init__(self):
+                    self.pause = False                    
+            controller = BogusController()
+            
         if reload:
             self.model.load_state_dict(torch.load(uichoosefile()))
                                            
@@ -63,10 +71,14 @@ class trainer():
         self.optimizer_type = optim.Adam
         self.optimizer = self.optimizer_type(self.model.parameters(), lr=1e-5)
 
+        self.iter_per_batch = 10  # not sure what to do with this. Training loop will
+                                  #  do this many iterations on each batch, before 
+                                  #  running and reporting a test, and grabbing new data. 
         
         self.xp = self.xtest.cpu().detach().numpy()  # these are useful for doing 
         self.yp = self.ytest.cpu().detach().numpy()  #  testing in numpy rather than torch. 
-            
+        
+        
     def train_step(self, input, target):
         self.model.train()  # make sure model is in training mode
         
@@ -84,17 +96,18 @@ class trainer():
         loss = self.criterion(pred, target)  # Check the MSE between y and yhat. 
         return loss.item()
     
-    def train(self):
+    def train(self):        
+        ppb = self.iter_per_batch
         model = self.model
         xtest, ytest = self.xtest, self.ytest
         _, yp = self.xp, self.yp
         losslist = []
         psave = []
-        test_loss = [1e15] * 10
+        test_loss = [1e15] * ppb
         done = False
         while not done:
             x,y = self.get_more_data()
-            for i in range(10):
+            for i in range(ppb):
                 steploss = self.train_step(x,y)
                 losslist.append(steploss)
             
@@ -113,11 +126,14 @@ class trainer():
             print('Test loss: ', test_loss[-1],'p: ',p)
                
             done = test_loss[-1] > losslist[-1] and \
-            test_loss[-1] > np.mean(test_loss[-10:-1]) and \
-            p > 0.8 and test_loss[-1] < self.max_loss
+            test_loss[-1] > np.mean(test_loss[-ppb:-1]) and \
+            p > 0.8 and test_loss[-1] < self.max_loss and \
+            not self.pause
         
         torch.save(self.model.state_dict(), \
-                   self.model.__class__.__name__ + date_for_filename())
+                   'saved_trained_states' + get_slash() + \
+                   self.model.__class__.__name__ + \
+                   date_for_filename())
 
     def set_device(self):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
