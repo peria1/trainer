@@ -124,12 +124,13 @@ class trainer():
             
             test_loss.append(self.test(xtest,ytest))
             print('Test loss: ', test_loss[-1],'p: ',p)
-               
+                           
             done = test_loss[-1] > losslist[-1] and \
             test_loss[-1] > np.mean(test_loss[-ppb:-1]) and \
-            p > 0.8 and test_loss[-1] < self.max_loss and \
-            not self.pause
-        
+            p > 0.8 and test_loss[-1] < self.max_loss 
+            
+            done = done or self.pause
+                    
         torch.save(self.model.state_dict(), \
                    'saved_trained_states' + get_slash() + \
                    self.model.__class__.__name__ + \

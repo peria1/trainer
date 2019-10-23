@@ -18,7 +18,12 @@ def fire_and_forget(f):
 
     return wrapped
 #
-# I do not understand why, but I can only get this to work using a decorator. 
+# I do not understand why, but I can only get this to work using a decorator. I kind of
+#    find decorators annoying. But I can't get the arguments to work correctly otherwise. 
+#    At this point I guess I can just decorate the call to trainer, like below, and then 
+#    I should be able to send commands to it from the Matplotlib interface. 
+#    
+#    Here what happens is 
 #
 @fire_and_forget
 def foo(st):
@@ -34,4 +39,6 @@ stat = status()
 print("Hello")
 #fire_and_forget(foo,stat)
 foo(stat)
+#foo = fire_and_forget(foo)
+
 print("I didn't wait for foo()")
