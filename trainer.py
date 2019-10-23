@@ -19,14 +19,13 @@ from torch import nn, optim
 #from torchvision.utils import save_image
 #import time
 from models import *
-import trainer_view
+#import trainer_view
 #import sys
 #sys.path.append('C:\\Users\\peria\\Desktop\\work\\Brent Lab\\Boucheron CNNs\\DLDBproject\\')
 from billUtils import kscirc, uichoosefile, date_for_filename, get_slash
 
 class trainer():
-    def __init__(self, trainee_class,max_loss=None,reload=False, \
-                 controller=None, **kwargs):
+    def __init__(self, trainee_class,max_loss=None,reload=False, **kwargs):
         #
         # Given the name of a trainee class, trainer.__init__ will instantiate that 
         #  class and get set up to train that instance. 
@@ -41,16 +40,8 @@ class trainer():
         trainee = trainee_class(**kwargs).to(self.device)
         self.model = trainee # a trainee needs an optimzer and a criterion, 
                                            #   as well as a way to generate data.
-                   
-        if controller:
-            controller.pause = False
-        else:
-            class BogusController():
-                def __init__(self):
-                    self.pause = False                    
-            controller = BogusController()
-            
-        if reload:
+                               
+        if reload:  # does not work on Windows, can't get Tk to work
             self.model.load_state_dict(torch.load(uichoosefile()))
                                            
         self.xtest, self.ytest = self.model.get_xy_batch()
