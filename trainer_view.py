@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import trainer as tr
 from models import *
 from trainer_utils import getnum
+from matplotlib.widgets import TextBox
 
 import asyncio
 
@@ -17,6 +18,7 @@ def fire_and_forget(f):
         return asyncio.get_event_loop().run_in_executor(None, f, *args, *kwargs)
 
     return wrapped
+
 
 class trainer_view():
     def __init__(self, *args):
@@ -27,6 +29,21 @@ class trainer_view():
         
         self.trainer = tr.trainer(*args)
         self.trainer.pause = False
+        
+                
+        #axbox = plt.axes([0.1, 0.05, 0.8, 0.075])
+        self.lr_box = TextBox(self.ax, 'learning rate', \
+                              initial=str(self.get_learning_rate()))
+        self.lr_box.on_submit(self.say_hello)
+
+    def say_hello(self,text):
+#        try:
+        print('setting lr to',text)
+        [print(float(t)) for t in text]
+        self.set_learning_rate(float(text))
+#        except:
+#            print('Unable to set learning rate to',text)
+
         
     @fire_and_forget
     def call_trainer(self):
@@ -45,8 +62,7 @@ class trainer_view():
             self.pause_training()
         elif event.key == 'l':
             self.pause_training()
-            lrlist = []
-            [lrlist.append(p['lr']) for p in self.trainer.optimizer.param_groups]
+            lrlist = self.get_learning_rate()
             print('Number of rates to set is',str(len(lrlist)))
             newlr = []
             for l in lrlist:
@@ -55,8 +71,7 @@ class trainer_view():
                 newlr.append(nlr)
             
             if len(newlr)==len(lrlist):
-                for i,p in enumerate(self.trainer.optimizer.param_groups):
-                    p['lr']=newlr[i]
+                set_learning_rate(newlr)
             
             self.call_trainer()
         else:
@@ -65,3 +80,12 @@ class trainer_view():
     def process_button(self, event): 
         print("Button:", event.x, event.y, event.xdata, event.ydata, event.button) 
 
+    def get_learning_rate(self):
+        lrlist = []
+        [lrlist.append(p['lr']) for p in self.trainer.optimizer.param_groups]
+        return lrlist[0]
+
+    def set_learning_rate(self, newlr):
+        for i,p in enumerate(self.trainer.optimizer.param_groups):
+            p['lr']=newlr
+ 
