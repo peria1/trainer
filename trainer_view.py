@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import trainer as tr
 from models import *
 from trainer_utils import getnum
-from matplotlib.widgets import TextBox
+from matplotlib.widgets import TextBox, Button
 
 import asyncio
 
@@ -21,17 +21,15 @@ def fire_and_forget(f):
 
 
 class trainer_view():
-    def __init__(self, *args):
+    def __init__(self, *args, **kwargs):
         self.fig, self.ax = plt.subplots(1,1)       
         self.fig.canvas.mpl_disconnect(self.fig.canvas.manager.key_press_handler_id)       
         self.fig.canvas.mpl_connect('key_press_event', self.process_key) 
         self.fig.canvas.mpl_connect('button_press_event', self.process_button) 
         
-        self.trainer = tr.trainer(*args)
+        self.trainer = tr.trainer(*args, **kwargs)
         self.trainer.pause = False
         
-                
-        #axbox = plt.axes([0.1, 0.05, 0.8, 0.075])
         self.lr_box = TextBox(self.ax, 'learning rate', \
                               initial=str(self.get_learning_rate()))
         self.lr_box.on_submit(self.say_hello)
@@ -71,7 +69,7 @@ class trainer_view():
                 newlr.append(nlr)
             
             if len(newlr)==len(lrlist):
-                set_learning_rate(newlr)
+                self.set_learning_rate(newlr)
             
             self.call_trainer()
         else:
@@ -89,3 +87,15 @@ class trainer_view():
         for i,p in enumerate(self.trainer.optimizer.param_groups):
             p['lr']=newlr
  
+
+class Label(object):
+    def __init__(self,ax,text):        
+        self.b = Button(ax,str(text))
+        self.b.on_clicked(self.clicked)
+    def change_to(self, text):
+        self.b.label.set_text(str(text))
+        plt.gcf().canvas.draw_idle()
+
+    def clicked(self, event):
+        pass
+

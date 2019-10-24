@@ -215,3 +215,68 @@ class inner_prod(nn.Module):
  
 
 
+class linregVAE(nn.Module):
+    def __init__(self,dim=2,npts=50, nbatch=128):  # this sets up 5 linear layers
+        super(linregVAE, self).__init__()
+
+        self.npts = npts
+        self.nbatch = nbatch        
+        self.z_dimension = dim
+#        self.register_backward_hook(grad_hook)
+        self.fc1 = nn.Linear(npts, npts) # stacked MNIST to 400
+        self.fc21 = nn.Linear(npts, self.z_dimension) # two hidden low D
+        self.fc22 = nn.Linear(npts, self.z_dimension) # layers, same size
+        self.fc3 = nn.Linear(self.z_dimension, npts)  
+        self.fc4 = nn.Linear(npts, npts)
+
+    def encode(self, x): 
+        from torch.nn import functional as F
+        h1 = F.relu(self.fc1(x))
+        mu = self.fc21(h1)
+        logvar = self.fc22(h1)
+        return mu, logvar
+
+    def reparameterize(self, mu, logvar):
+        std = torch.exp(0.5*logvar)
+        eps = torch.randn_like(std) # <- Stochasticity!!!
+        # How can the previous line allow back propagation? The question is, does the 
+        #   loss function depend on eps? For starters, it returns a normal 
+        #   with the same dimensions as std, rather than one that has the variances
+        #   implied by std. That's why we scale by std, below, when returning. 
+        #   Because we are only using the dimensions of std to get eps, does that mean
+        #   that the loss function is independent of eps? I am missing something. 
+        #
+        return mu + eps*std
+
+    def decode(self, z):
+        from torch.nn import functional as F
+        h3 = F.relu(self.fc3(z))
+        return torch.sigmoid(self.fc4(h3))
+
+    def forward(self, x):
+        mu, logvar = self.encode(x)
+#        mu, logvar = self.encode(x.view(-1, 784))
+        z = self.reparameterize(mu, logvar)
+        return self.decode(z) #, mu, logvar
+
+    def get_xy_batch(self):
+        nbatch = self.nbatch
+        npts = self.npts
+        
+        xsize = (nbatch,npts)
+        
+        xrange = 20.0
+        sloperange = 10.0
+        
+        noiseamp = np.random.uniform(low=xrange/100.0, high = xrange/5.0, size=(nbatch,1))
+        noise = np.random.normal(scale=noiseamp,size=xsize)
+        slope = np.random.uniform(-sloperange,sloperange,size=(nbatch,1))
+        offset = np.random.uniform(-sloperange,sloperange,size=(nbatch,1))
+        
+        x = np.random.uniform(low=-xrange, high=xrange, size=xsize)
+        y = (x - offset) * slope
+        x = x + noise
+        
+        x = torch.from_numpy(x).to(torch.float)
+        y = torch.from_numpy(y).to(torch.float)
+        return x,y
