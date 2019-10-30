@@ -103,7 +103,7 @@ class trainer():
         psave = []
         test_loss = [1e15] * ppb
         done = False
-        while not done:
+        while not (done or self.pause):
             x,y = self.get_more_data()
             for i in range(ppb):
                 steploss = self.train_step(x,y)
@@ -122,30 +122,38 @@ class trainer():
             
             test_loss.append(self.test(xtest,ytest))
 
+            up_since_last = test_loss[-1] > losslist[-1]
+            larger_than_recent_average = test_loss[-1] > np.mean(test_loss[-ppb:-1])
+            kscirc_plausible = p > 0.8
+            loss_small_enough = test_loss[-1] < self.max_loss 
+
+            done =  up_since_last and \
+             larger_than_recent_average and \
+             kscirc_plausible and \
+             loss_small_enough  # ignored if user did not set max_loss keyword
+            
             loss_str = f'Test loss: {test_loss[-1]:6.3e}    p:  {p:5.2e}'
+            if done:
+                loss_str = loss_str + '   DONE!!'
+            elif self.pause:
+                loss_str = loss_str + '   paused.'
+            
             if not self.viewer:
                 print(loss_str)
             else:
                 self.viewer.ax.set_title(str(loss_str))
                 self.viewer.fig.canvas.draw()
                 self.viewer.fig.canvas.flush_events()
+
                            
-            done = test_loss[-1] > losslist[-1] and \
-            test_loss[-1] > np.mean(test_loss[-ppb:-1]) and \
-            p > 0.8 and test_loss[-1] < self.max_loss 
-            
-            done = done or self.pause
-                    
-        torch.save(self.model.state_dict(), \
-                   'saved_trained_states' + get_slash() + \
-                   self.model.__class__.__name__ + \
-                   date_for_filename())
+        if done:            
+            torch.save(self.model.state_dict(), \
+                       'saved_trained_states' + get_slash() + \
+                       self.model.__class__.__name__ + \
+                       date_for_filename())
 
     def set_device(self):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
-    def set_learning_rate(self, lr):
-        self.optimizer = self.optimizer_type(self.model.parameters(), lr=lr)
         
     def get_more_data(self):
         x,y = self.model.get_xy_batch()
