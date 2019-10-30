@@ -25,7 +25,8 @@ from models import *
 from trainer_utils import kscirc, uichoosefile, date_for_filename, get_slash
 
 class trainer():
-    def __init__(self, trainee_class,max_loss=None,reload=False, **kwargs):
+    def __init__(self, trainee_class,max_loss=None,reload=False, \
+                 viewer=None, **kwargs):
         #
         # Given the name of a trainee class, trainer.__init__ will instantiate that 
         #  class and get set up to train that instance. 
@@ -40,6 +41,11 @@ class trainer():
         trainee = trainee_class(**kwargs).to(self.device)
         self.model = trainee # a trainee needs an optimzer and a criterion, 
                                            #   as well as a way to generate data.
+        if viewer:
+            self.viewer = viewer
+        else:
+            self.viewer = None
+            
                                
         if reload:  # does not work on Windows, can't get Tk to work
             self.model.load_state_dict(torch.load(uichoosefile()))
@@ -115,7 +121,14 @@ class trainer():
             psave.append(p)
             
             test_loss.append(self.test(xtest,ytest))
-            print('Test loss: ', test_loss[-1],'p: ',p)
+
+            loss_str = f'Test loss: {test_loss[-1]:6.3e}    p:  {p:5.2e}'
+            if not self.viewer:
+                print(loss_str)
+            else:
+                self.viewer.ax.set_title(str(loss_str))
+                self.viewer.fig.canvas.draw()
+                self.viewer.fig.canvas.flush_events()
                            
             done = test_loss[-1] > losslist[-1] and \
             test_loss[-1] > np.mean(test_loss[-ppb:-1]) and \

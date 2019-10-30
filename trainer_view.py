@@ -27,12 +27,13 @@ class trainer_view():
         self.fig.canvas.mpl_connect('key_press_event', self.process_key) 
         self.fig.canvas.mpl_connect('button_press_event', self.process_button) 
         
-        self.trainer = tr.trainer(*args, **kwargs)
+        self.trainer = tr.trainer(*args, **kwargs, viewer=self)
         self.trainer.pause = False
         
         self.lr_box = TextBox(self.ax, 'learning rate', \
                               initial=str(self.get_learning_rate()))
         self.lr_box.on_submit(self.say_hello)
+        
 
     def say_hello(self,text):
 #        try:
