@@ -142,6 +142,10 @@ class trainer():
                 print(loss_str)
             else:
                 self.viewer.ax.set_title(str(loss_str))
+                if self.viewer.update_plot:
+                    self.viewer.ax.clear()
+                    self.viewer.ax.plot(losslist)
+                    self.viewer.update_plot = False
                 self.viewer.fig.canvas.draw()
                 self.viewer.fig.canvas.flush_events()
 

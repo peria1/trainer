@@ -29,6 +29,7 @@ class trainer_view():
         
         self.trainer = tr.trainer(*args, **kwargs, viewer=self)
         self.trainer.pause = False
+        self.update_plot = False
 
         axbox = plt.axes([0.7, 0.8, 0.2, 0.075]) # left, bottom, width, height
         self.lr_box = TextBox(axbox, 'learning rate', \
@@ -59,8 +60,10 @@ class trainer_view():
         elif event.key == 'p':
             print('Paused.')
             self.pause_training()
+        elif event.key == 'g':
+            self.update_plot = True
         else:
-            print(event.key,'?')
+            print(event.key,'??!')
 
     def process_button(self, event): 
         print("Button:", event.x, event.y, event.xdata, event.ydata, event.button) 
