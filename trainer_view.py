@@ -36,6 +36,13 @@ class trainer_view():
                               initial=str(self.get_learning_rate()))
         self.lr_box.on_submit(self.set_learning_rate)
         
+        axbutton = plt.axes([0.7, 0.7, 0.2, 0.075])
+        self.start_button = Button(axbutton, 'Start')
+        self.start_button.label.set_color('white')
+        self.start_button.label.set_fontweight('bold')
+        self.start_button.color = 'green'
+        self.start_button.on_clicked(self.deal_with_button)
+
 
     def set_learning_rate(self,text):
         try:
@@ -45,8 +52,23 @@ class trainer_view():
             print('Unable to set learning rate to',text)
 
         
+    def deal_with_button(self, other_arg):
+        label = self.start_button.label.get_text()
+        if label == 'Start':
+            self.start_button.label.set_text('Pause')
+            self.start_button.color = 'red'
+            self.call_trainer()
+        elif label == 'Pause':
+            self.start_button.label.set_text('Start')
+            self.start_button.color = 'green'
+            self.pause_training()
+        else:
+            print('How did this happen? Start button label is', label)
+
+
     @fire_and_forget       # this enables training to run in background
     def call_trainer(self):
+        print('hello')
         self.trainer.pause = False
         self.trainer.train()
 
