@@ -11,7 +11,6 @@ Created on Sun Oct  6 07:32:17 2019
 
 @author: Bill
 
-Can a model learn that each y is the square root of the sum of all the x^2 values? 
 
 """
 import torch
@@ -84,7 +83,152 @@ class quadsum(nn.Module):
     
         y = y + noise
         return x,y
+
+
+class linreg(nn.Module):
+    def __init__(self, npts=None, nbatch=None):  # trying to see if machine can tell that y is the sum over x 
+        super(linreg, self).__init__()
+
+        if npts is None:
+            npts = 64
+        if nbatch is None:
+            nbatch = 128
+        
+        try:
+            assert((npts != 0) and (npts & (npts-1) == 0))
+        except AssertionError:
+            print('Number of points in each example must be a power of two')
+        
+        self.npts = npts
+        self.nbatch = nbatch
+        
+        n = npts*2
+        self.layer_list = nn.ModuleList([nn.Linear(npts,n)])
+        while n > 2:
+            self.layer_list.append(nn.Linear(n,n//2))
+            n//=2
+            
+#        self.L1 = nn.Linear(npts, 2*npts)
+#        self.L2 = nn.Linear(2*npts, 2*npts)
+#        self.L3 = nn.Linear(2*npts, 2*npts)
+#        self.L4 = nn.Linear(2*npts, 2*npts)
+#        print(type(npts//2))
+#        self.L5 = nn.Linear(2*npts, npts//2)
+#        self.L6 = nn.Linear(npts//2, npts//4)
+#        self.L7 = nn.Linear(npts//4, npts//8)
+#        self.L8 = nn.Linear(npts//8, npts//4)
+#        self.L9 = nn.Linear(npts//4, npts//2)
+#        self.L10 = nn.Linear(npts//2, npts)
+#        self.Llast = nn.Linear(npts, npts)
+#        
+#        self.weight_vector = nn.Linear(npts, 1) # npts is the size of each 1D example
+
+    def forward(self, xy):
+        dataflow = xy
+        for L in self.layer_list:
+            dataflow = torch.relu(L(dataflow))
+        
+        return dataflow
+        
+#        dataflow = torch.sigmoid(self.L1(x))
+#        dataflow = torch.sigmoid(self.L2(dataflow))
+#        dataflow = torch.sigmoid(self.L3(dataflow))
+#        dataflow = torch.relu(self.L4(dataflow))
+#        dataflow5 = torch.relu(self.L5(dataflow))
+#        dataflow6 = torch.relu(self.L6(dataflow5))
+#        dataflow7 = torch.relu(self.L7(dataflow6))
+#        dataflow = torch.relu(self.L8(dataflow7))
+#        dataflow = torch.relu(self.L9(dataflow))
+#        dataflow = torch.relu(self.L10(dataflow))
+#        result = torch.relu(self.Llast(dataflow))
+        
+#        return result
+
+    def get_xy_batch(self):
+        nbatch = self.nbatch
+        npts = self.npts
+        
+        half = int(npts/2)
+        xsize = (nbatch,half)
+        
+        xrange = 20.0
+        sloperange = 10.0
+        
+        noiseamp = np.random.uniform(low=xrange/100.0, high = xrange/5.0, size=(nbatch,1))
+        noise = np.random.normal(scale=noiseamp,size=xsize)
+        slope = np.random.uniform(-sloperange,sloperange,size=(nbatch,1))
+        offset = np.random.uniform(-sloperange,sloperange,size=(nbatch,1))
+        
+        x = np.random.uniform(low=-xrange, high=xrange, size=xsize)
+        y = (x - offset) * slope
+        y = y + noise
+        
+        x = torch.from_numpy(x).to(torch.float)
+        y = torch.from_numpy(y).to(torch.float)
+        xy = torch.cat((x,y),1)
+        
+        labels = torch.cat((torch.from_numpy(slope),torch.from_numpy(offset)),1).to(torch.float)
+        
+        return xy, labels
  
+
+class prop(nn.Module):
+    def __init__(self, npts=None, nbatch=None): 
+        super(prop, self).__init__()
+
+        if npts is None:
+            npts = 64
+        if nbatch is None:
+            nbatch = 128
+        
+        try:
+            assert((npts != 0) and (npts & (npts-1) == 0))
+        except AssertionError:
+            print('Number of points in each example must be a power of two')
+        
+        self.npts = npts
+        self.nbatch = nbatch
+        
+        n = npts*2
+        self.layer_list = nn.ModuleList([nn.Linear(npts,n)])
+        while n >= 2:
+            self.layer_list.append(nn.Linear(n,n//2))
+            n//=2
+
+    def forward(self, xy):
+        dataflow = xy
+        for L in self.layer_list:
+            dataflow = torch.relu(L(dataflow))
+        
+        return dataflow
+        
+    def get_xy_batch(self):
+        nbatch = self.nbatch
+        npts = self.npts
+        
+        half = int(npts/2)
+        xsize = (nbatch,half)
+        
+        xrange = 20.0
+        sloperange = 10.0
+        
+        noiseamp = np.random.uniform(low=xrange/100.0, high = xrange/20.0, size=(nbatch,1))
+        noise = np.random.normal(scale=noiseamp,size=xsize)
+        slope = np.random.uniform(-sloperange,sloperange,size=(nbatch,1))
+        
+        x = np.random.uniform(low=-xrange, high=xrange, size=xsize)
+        y = x * slope
+        y = y + noise
+        
+        x = torch.from_numpy(x).to(torch.float)
+        y = torch.from_numpy(y).to(torch.float)
+        xy = torch.cat((x,y),1)
+        
+        slopes = torch.from_numpy(slope).to(torch.float)
+        
+        return xy, slopes
+
+
 
 class xycorr(nn.Module):
     def __init__(self, npts=None, nbatch=None):  # trying to see if machine can tell that y is the sum over x 

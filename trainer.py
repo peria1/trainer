@@ -7,7 +7,7 @@ Created on Mon Oct 14 14:28:42 2019
 
 
 
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 #import argparse
 #import itertools
 import torch
@@ -41,18 +41,24 @@ class trainer():
         trainee = trainee_class(**kwargs).to(self.device)
         self.model = trainee # a trainee needs an optimzer and a criterion, 
                                            #   as well as a way to generate data.
+                                           
+        self.model.to(self.device)
         if viewer:
             self.viewer = viewer
         else:
             self.viewer = None
             
-                               
+        self.train_loss_history = []
+        self.test_loss_history = []
+                       
+#        print('trainer device is ',self.device)
         if reload:  # does not work on Windows, can't get Tk to work
             self.model.load_state_dict(torch.load(uichoosefile()))
                                            
         self.xtest, self.ytest = self.model.get_xy_batch()
         self.xtest = self.xtest.to(self.device)
         self.ytest = self.ytest.to(self.device)
+        
 
         try:
             assert(self.model(self.xtest).size()==self.ytest.size())
@@ -82,6 +88,7 @@ class trainer():
         
         self.optimizer.zero_grad()  # Make the gradients zero to start the step.
         pred = self.model(input)      #  Find the current predictions, yhat. 
+#        print(type(pred), pred.size(), type(target),target.size())
         loss = self.criterion(pred, target)  # Check the MSE between y and yhat. 
         loss.backward()      # Do back propagation! Thank you Pytorch!
         self.optimizer.step()     # take one step down the gradient. 
@@ -99,7 +106,7 @@ class trainer():
         model = self.model
         xtest, ytest = self.xtest, self.ytest
         _, yp = self.xp, self.yp
-        losslist = []
+        self.train_loss_history = []
         psave = []
         test_loss = [1e15] * ppb
         done = False
@@ -107,7 +114,7 @@ class trainer():
             x,y = self.get_more_data()
             for i in range(ppb):
                 steploss = self.train_step(x,y)
-                losslist.append(steploss)
+                self.train_loss_history.append(steploss)
             
             res = (model(xtest)-ytest).cpu().detach().numpy()
             pos = res > 0
@@ -120,19 +127,20 @@ class trainer():
             
             psave.append(p)
             
-            test_loss.append(self.test(xtest,ytest))
+            self.test_loss_history.append(self.test(xtest,ytest))
 
-            up_since_last = test_loss[-1] > losslist[-1]
-            larger_than_recent_average = test_loss[-1] > np.mean(test_loss[-ppb:-1])
-            kscirc_plausible = p > 0.8
-            loss_small_enough = test_loss[-1] < self.max_loss 
+            up_since_last = self.test_loss_history[-1] > self.train_loss_history[-1]
+            larger_than_recent_average = \
+            self.test_loss_history[-1] > np.mean(self.test_loss_history[-ppb:-1])
+            kscirc_plausible = p > 0.5
+            loss_small_enough = self.test_loss_history[-1] < self.max_loss 
 
             done =  up_since_last and \
              larger_than_recent_average and \
              kscirc_plausible and \
              loss_small_enough  # ignored if user did not set max_loss keyword
             
-            loss_str = f'Test loss: {test_loss[-1]:6.3e}    p:  {p:5.2e}'
+            loss_str = f'Test loss: {self.test_loss_history[-1]:6.3e}    p:  {p:5.2e}'
             if done:
                 loss_str = loss_str + '   DONE!!'
             elif self.pause:
@@ -142,13 +150,11 @@ class trainer():
                 print(loss_str)
             else:
                 self.viewer.ax.set_title(str(loss_str))
-                if self.viewer.update_plot:
-                    self.viewer.ax.clear()
-                    self.viewer.ax.plot(losslist)
-                    self.viewer.update_plot = False
                 self.viewer.fig.canvas.draw()
                 self.viewer.fig.canvas.flush_events()
 
+                self.viewer.update_displays()
+ 
                            
         if done:            
             torch.save(self.model.state_dict(), \
@@ -162,6 +168,8 @@ class trainer():
     def get_more_data(self):
         x,y = self.model.get_xy_batch()
         return x.to(self.device), y.to(self.device)
+
+        
     
 #    def set_max_loss(self, max_loss)
         
