@@ -8,9 +8,9 @@ Created on Mon Oct 21 06:16:10 2019
 import matplotlib.pyplot as plt
 import trainer as tr
 from models import *
-#from trainer_utils import getnum
+from trainer_utils import date_for_filename
 from matplotlib.widgets import TextBox, Button
-
+import trainer_plots as tp
 import asyncio
 #
 # The following code can be used to decorate a function; such a decorated function 
@@ -38,7 +38,10 @@ class trainer_view():
         self.update_plots = False
 
         self.displays = [self.Training_Display(name='loss history',\
-                                               nrows=2,ncols=1,update=self.basic_loss_plot)]
+                                               nrows=2,ncols=1,\
+                                               update=tp.basic_loss_plot),\
+                         self.Training_Display(name='residuals',\
+                                               update=tp.residual_plot)]
 
         # Button layout, for a column at the right-hand side of window. 
         left_edge = 0.6
@@ -64,7 +67,7 @@ class trainer_view():
         self.disp_button.label.set_color(text_color)
         self.disp_button.label.set_fontweight('bold')
         self.disp_button.color = 'black'
-        self.disp_button.on_clicked(self.set_update_flag)
+        self.disp_button.on_clicked(self.handle_update_button)
 
         newbutton = plt.axes([left_edge, 0.5, width, height])
         self.new_button = Button(newbutton, 'New Display')
@@ -81,27 +84,25 @@ class trainer_view():
         self.clear_button.on_clicked(self.clear_history)
         
     def clear_history(self,event):
-        pass
+        self.trainer.zap_history()
     
-    def set_update_flag(self, event):
+    def handle_update_button(self, event):
+        self.set_update_flag()
+        
+    def set_update_flag(self):
         print('setting update flag to True...')
         self.update_plots = True
-    
-    def basic_loss_plot(self,d):
-        d.ax[0].plot(self.trainer.train_loss_history)
-        d.ax[1].plot(self.trainer.test_loss_history)
-    
+
     def update_displays(self):
-#        print('update plots flag is',self.update_plots)
         if self.update_plots:
-            print('updating...')
             self.update_plots = False
             for d in self.displays:
-                for a in d.ax:
-                    a.clear()
-    # Replace next line with something more general eventually
-                d.update(d)
-#                d.ax.plot(self.trainer.test_loss_history)
+                try:
+                    for a in d.ax:
+                        a.clear()
+                except TypeError:
+                    d.ax.clear()             
+                d.update(self,d)   # this is calling the custom plotting function
                 d.fig.canvas.draw()
                 d.fig.canvas.flush_events()
 
@@ -169,4 +170,4 @@ class trainer_view():
                 self.update = update
                 
         def update(self):
-            pass
+            print('You need to define an update function in Training_Display objects.')

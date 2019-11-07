@@ -81,7 +81,8 @@ class trainer():
         
         self.xp = self.xtest.cpu().detach().numpy()  # these are useful for doing 
         self.yp = self.ytest.cpu().detach().numpy()  #  testing in numpy rather than torch. 
-        
+
+        self.zap_history()        
         
     def train_step(self, input, target):
         self.model.train()  # make sure model is in training mode
@@ -106,9 +107,6 @@ class trainer():
         model = self.model
         xtest, ytest = self.xtest, self.ytest
         _, yp = self.xp, self.yp
-        self.train_loss_history = []
-        psave = []
-        test_loss = [1e15] * ppb
         done = False
         while not (done or self.pause):
             x,y = self.get_more_data()
@@ -125,7 +123,7 @@ class trainer():
             else:
                 p = 0.
             
-            psave.append(p)
+            self.p_history.append(p)
             
             self.test_loss_history.append(self.test(xtest,ytest))
 
@@ -156,7 +154,10 @@ class trainer():
                 self.viewer.update_displays()
  
                            
-        if done:            
+        if done:
+            print('should update!')
+            self.viewer.set_update_flag()
+            self.viewer.update_displays()
             torch.save(self.model.state_dict(), \
                        'saved_trained_states' + get_slash() + \
                        self.model.__class__.__name__ + \
@@ -168,6 +169,14 @@ class trainer():
     def get_more_data(self):
         x,y = self.model.get_xy_batch()
         return x.to(self.device), y.to(self.device)
+    
+    def zap_history(self):
+        self.train_loss_history = []
+        self.test_loss_history = []
+        self.p_history = []
+
+        
+        
 
         
     
