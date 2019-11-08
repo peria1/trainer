@@ -156,7 +156,7 @@ class trainer():
                            
         if done:
             print('should update!')
-            self.viewer.set_update_flag()
+            self.viewer.set_update_flag(flag=True)
             self.viewer.update_displays()
             torch.save(self.model.state_dict(), \
                        'saved_trained_states' + get_slash() + \

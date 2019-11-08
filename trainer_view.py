@@ -34,6 +34,7 @@ class trainer_view():
 #        self.displays = [loss_graph]
         
         self.trainer = tr.trainer(*args, **kwargs, viewer=self)
+        print(self.trainer.optimizer)
         self.trainer.pause = False
         self.update_plots = False
 
@@ -63,11 +64,12 @@ class trainer_view():
         self.start_button.on_clicked(self.deal_with_start_button)
         
         dispbutton = plt.axes([left_edge, 0.6, width, height])
-        self.disp_button = Button(dispbutton, 'Refresh')
+        self.disp_button = Button(dispbutton, 'Update Displays')
         self.disp_button.label.set_color(text_color)
         self.disp_button.label.set_fontweight('bold')
         self.disp_button.color = 'black'
-        self.disp_button.on_clicked(self.handle_update_button)
+#        self.disp_button.on_clicked(self.handle_update_button)
+        self.disp_button.on_clicked(self.deal_with_update_button)
 
         newbutton = plt.axes([left_edge, 0.5, width, height])
         self.new_button = Button(newbutton, 'New Display')
@@ -86,16 +88,20 @@ class trainer_view():
     def clear_history(self,event):
         self.trainer.zap_history()
     
-    def handle_update_button(self, event):
-        self.set_update_flag()
-        
-    def set_update_flag(self):
-        print('setting update flag to True...')
-        self.update_plots = True
+#    def handle_update_button(self, event):
+#        self.event = event
+#        dir(event)
+#        self.set_update_flag()
+#        
+    def set_update_flag(self, flag=True):
+        if flag is True:
+            print('setting update flag to True...')
+            self.update_plots = True
+        else:
+            self.update_plots = False
 
     def update_displays(self):
         if self.update_plots:
-            self.update_plots = False
             for d in self.displays:
                 try:
                     for a in d.ax:
@@ -132,6 +138,21 @@ class trainer_view():
             self.start_button.color = 'green'
         else:
             print('How did this happen? Start button label is', label)
+
+    def deal_with_update_button(self, other_arg):  
+        # Start or pause training, and toggle the button to the other state. 
+        label = self.disp_button.label.get_text()
+        if label == 'Update Displays':
+            self.set_update_flag(flag=True)
+            # Grt ready to Pause next time button is pushed. 
+            self.disp_button.label.set_text('Pause Displays')
+            self.disp_button.color = 'red'
+        elif label == 'Pause Displays':
+            self.set_update_flag(flag=False)
+            self.disp_button.label.set_text('Update Displays')
+            self.disp_button.color = 'green'
+        else:
+            print('How did this happen? Update button label is', label)
 
 
     @fire_and_forget       # this enables training to run in background
@@ -171,3 +192,4 @@ class trainer_view():
                 
         def update(self):
             print('You need to define an update function in Training_Display objects.')
+            print('Look in trainer_plots.py to see examples of update functions.')
