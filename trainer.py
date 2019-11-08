@@ -132,6 +132,8 @@ class trainer():
              loss_small_enough  # ignored if user did not set max_loss keyword
             
             loss_str = f'Test loss: {self.test_loss_history[-1]:6.3e}    p:  {p:5.2e}'
+            loss_str = self.get_model_name() + ' ' + loss_str
+            
             if done:
                 loss_str = loss_str + '   DONE!!'
             elif self.pause:
@@ -170,11 +172,7 @@ class trainer():
         self.test_loss_history = []
         self.p_history = []
 
-        
-        
-
-        
-    
-#    def set_max_loss(self, max_loss)
-        
+    def get_model_name(self):
+        func_rep = str(self.model)
+        return func_rep[0:func_rep.find('(')]
      

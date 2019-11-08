@@ -249,18 +249,18 @@ class cumulative_sum(nn.Module):
         self.L6 = nn.Linear(2*npts, 2*npts)
         self.L7 = nn.Linear(2*npts, 2*npts)
         self.Llast = nn.Linear(2*npts, npts)
-        
+        self.leaky = nn.LeakyReLU()
 
 
     def forward(self, x):
-        dataflow = torch.relu(self.L1(x))
-        dataflow = torch.relu(self.L2(dataflow))
-        dataflow = torch.relu(self.L3(dataflow))
-        dataflow = torch.relu(self.L4(dataflow))
-        dataflow = torch.relu(self.L5(dataflow))
-        dataflow = torch.relu(self.L6(dataflow))
-        dataflow = torch.relu(self.L7(dataflow))
-        dataflow = torch.relu(self.Llast(dataflow))
+        dataflow = self.leaky(self.L1(x))
+        dataflow = self.leaky(self.L2(dataflow))
+        dataflow = self.leaky(self.L3(dataflow))
+        dataflow = self.leaky(self.L4(dataflow))
+        dataflow = self.leaky(self.L5(dataflow))
+        dataflow = self.leaky(self.L6(dataflow))
+        dataflow = self.leaky(self.L7(dataflow))
+        dataflow = self.leaky(self.Llast(dataflow))
         
         return dataflow
         
@@ -272,7 +272,6 @@ class cumulative_sum(nn.Module):
         xrange = 20.0
         x = np.random.uniform(low=-xrange, high=xrange, size=xsize)
         y = np.cumsum(x,axis=1)
-        print(x.shape,y.shape)
         x = torch.from_numpy(x).to(torch.float)
         y = torch.from_numpy(y).to(torch.float)
         

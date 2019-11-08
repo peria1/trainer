@@ -199,8 +199,7 @@ class trainer_view():
         lrlist = []
         [lrlist.append(p['lr']) for p in self.trainer.optimizer.param_groups]
         return lrlist[0]
-
-            
+        
     class Training_Display():
         def __init__(self, name='no name', nrows=1, ncols=1,update=None):
             self.fig, self.ax = plt.subplots(nrows,ncols)
