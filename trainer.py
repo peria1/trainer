@@ -14,14 +14,7 @@ import torch
 import numpy as np
 #import torch.utils.data
 from torch import nn, optim
-#from torch.nn import functional as F
-#from torchvision import datasets, transforms
-#from torchvision.utils import save_image
-#import time
 from models import *
-#import trainer_view
-#import sys
-#sys.path.append('C:\\Users\\peria\\Desktop\\work\\Brent Lab\\Boucheron CNNs\\DLDBproject\\')
 from trainer_utils import kscirc, uichoosefile, date_for_filename, get_slash
 
 class trainer():
@@ -139,6 +132,8 @@ class trainer():
              loss_small_enough  # ignored if user did not set max_loss keyword
             
             loss_str = f'Test loss: {self.test_loss_history[-1]:6.3e}    p:  {p:5.2e}'
+            loss_str = self.get_model_name() + ' ' + loss_str
+            
             if done:
                 loss_str = loss_str + '   DONE!!'
             elif self.pause:
@@ -156,8 +151,10 @@ class trainer():
                            
         if done:
             print('should update!')
-            self.viewer.set_update_flag()
+            self.viewer.set_update_flag(flag=True)
             self.viewer.update_displays()
+            self.viewer.arm_start_button()
+            
             torch.save(self.model.state_dict(), \
                        'saved_trained_states' + get_slash() + \
                        self.model.__class__.__name__ + \
@@ -175,11 +172,7 @@ class trainer():
         self.test_loss_history = []
         self.p_history = []
 
-        
-        
-
-        
-    
-#    def set_max_loss(self, max_loss)
-        
+    def get_model_name(self):
+        func_rep = str(self.model)
+        return func_rep[0:func_rep.find('(')]
      

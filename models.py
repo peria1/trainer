@@ -266,6 +266,55 @@ class prop(nn.Module):
         return xy, slopes
 
 
+class cumulative_sum(nn.Module):
+    def __init__(self, npts=None, nbatch=None): 
+        super(cumulative_sum, self).__init__()
+
+        if npts is None:
+            npts = 50
+        if nbatch is None:
+            nbatch = 128
+        
+        self.npts = npts
+        self.nbatch = nbatch
+        
+        self.L1 = nn.Linear(npts, 2*npts)
+        self.L2 = nn.Linear(2*npts, 2*npts)
+        self.L3 = nn.Linear(2*npts, 2*npts)
+        self.L4 = nn.Linear(2*npts, 2*npts)
+        self.L5 = nn.Linear(2*npts, 2*npts)
+        self.L6 = nn.Linear(2*npts, 2*npts)
+        self.L7 = nn.Linear(2*npts, 2*npts)
+        self.Llast = nn.Linear(2*npts, npts)
+        self.leaky = nn.LeakyReLU()
+
+
+    def forward(self, x):
+        dataflow = self.leaky(self.L1(x))
+        dataflow = self.leaky(self.L2(dataflow))
+        dataflow = self.leaky(self.L3(dataflow))
+        dataflow = self.leaky(self.L4(dataflow))
+        dataflow = self.leaky(self.L5(dataflow))
+        dataflow = self.leaky(self.L6(dataflow))
+        dataflow = self.leaky(self.L7(dataflow))
+        dataflow = self.leaky(self.Llast(dataflow))
+        
+        return dataflow
+        
+    def get_xy_batch(self):
+        nbatch = self.nbatch
+        npts = self.npts
+        xsize = (nbatch,npts)
+
+        xrange = 20.0
+        x = np.random.uniform(low=-xrange, high=xrange, size=xsize)
+        y = np.cumsum(x,axis=1)
+        x = torch.from_numpy(x).to(torch.float)
+        y = torch.from_numpy(y).to(torch.float)
+        
+        return x, y
+
+
 
 class xycorr(nn.Module):
     def __init__(self, npts=None, nbatch=None):  # trying to see if machine can tell that y is the sum over x 

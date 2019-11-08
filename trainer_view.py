@@ -34,6 +34,7 @@ class trainer_view():
 #        self.displays = [loss_graph]
         
         self.trainer = tr.trainer(*args, **kwargs, viewer=self)
+        print(self.trainer.optimizer)
         self.trainer.pause = False
         self.update_plots = False
 
@@ -50,33 +51,41 @@ class trainer_view():
         text_color = 'white'
         
         plt.figure(self.fig.number)
-        axbox = plt.axes([left_edge, 0.8, width, height]) # left, bottom, width, height
+        
+        axloss = plt.axes([left_edge, 0.8, width, height]) # left, bottom, width, height
+        self.loss_box = TextBox(axloss, 'Max Loss', \
+                              initial=str(1e30))
+        self.loss_box.on_submit(self.set_max_loss)
+        
+        
+        axbox = plt.axes([left_edge, 0.7, width, height]) 
         self.lr_box = TextBox(axbox, 'learning rate', \
                               initial=str(self.get_learning_rate()))
         self.lr_box.on_submit(self.set_learning_rate)
         
-        axbutton = plt.axes([left_edge, 0.7, width, height])
+        axbutton = plt.axes([left_edge, 0.6, width, height])
         self.start_button = Button(axbutton, 'Start')
         self.start_button.label.set_color(text_color)
         self.start_button.label.set_fontweight('bold')
         self.start_button.color = 'green'  # callback will toggle the color
         self.start_button.on_clicked(self.deal_with_start_button)
         
-        dispbutton = plt.axes([left_edge, 0.6, width, height])
-        self.disp_button = Button(dispbutton, 'Refresh')
+        dispbutton = plt.axes([left_edge, 0.5, width, height])
+        self.disp_button = Button(dispbutton, 'Update Displays')
         self.disp_button.label.set_color(text_color)
         self.disp_button.label.set_fontweight('bold')
         self.disp_button.color = 'black'
-        self.disp_button.on_clicked(self.handle_update_button)
+#        self.disp_button.on_clicked(self.handle_update_button)
+        self.disp_button.on_clicked(self.deal_with_update_button)
 
-        newbutton = plt.axes([left_edge, 0.5, width, height])
+        newbutton = plt.axes([left_edge, 0.4, width, height])
         self.new_button = Button(newbutton, 'New Display')
         self.new_button.label.set_color(text_color)
         self.new_button.label.set_fontweight('bold')
         self.new_button.color = 'black'
         self.new_button.on_clicked(self.add_display)
 
-        clearbutton = plt.axes([left_edge, 0.4, width, height])
+        clearbutton = plt.axes([left_edge, 0.3, width, height])
         self.clear_button = Button(clearbutton, 'Clear History')
         self.clear_button.label.set_color(text_color)
         self.clear_button.label.set_fontweight('bold')
@@ -86,16 +95,20 @@ class trainer_view():
     def clear_history(self,event):
         self.trainer.zap_history()
     
-    def handle_update_button(self, event):
-        self.set_update_flag()
-        
-    def set_update_flag(self):
-        print('setting update flag to True...')
-        self.update_plots = True
+#    def handle_update_button(self, event):
+#        self.event = event
+#        dir(event)
+#        self.set_update_flag()
+#        
+    def set_update_flag(self, flag=True):
+        if flag is True:
+            print('setting update flag to True...')
+            self.update_plots = True
+        else:
+            self.update_plots = False
 
     def update_displays(self):
         if self.update_plots:
-            self.update_plots = False
             for d in self.displays:
                 try:
                     for a in d.ax:
@@ -109,6 +122,12 @@ class trainer_view():
     def add_display(self, event):
         pass
 
+    def set_max_loss(self, text):
+        try:
+            self.trainer.max_loss = float(text)
+        except:
+            print('Unable to set max loss to',text)
+                
     def set_learning_rate(self,text):
         try:
             self.trainer.optimizer = \
@@ -133,6 +152,25 @@ class trainer_view():
         else:
             print('How did this happen? Start button label is', label)
 
+    def deal_with_update_button(self, other_arg):  
+        # Start or pause training, and toggle the button to the other state. 
+        label = self.disp_button.label.get_text()
+        if label == 'Update Displays':
+            self.set_update_flag(flag=True)
+            # Grt ready to Pause next time button is pushed. 
+            self.disp_button.label.set_text('Pause Displays')
+            self.disp_button.color = 'red'
+        elif label == 'Pause Displays':
+            self.set_update_flag(flag=False)
+            self.disp_button.label.set_text('Update Displays')
+            self.disp_button.color = 'green'
+        else:
+            print('How did this happen? Update button label is', label)
+
+    def arm_start_button(self):
+            self.start_button.label.set_text('Start')
+            self.start_button.color = 'green'
+        
 
     @fire_and_forget       # this enables training to run in background
     def call_trainer(self):
@@ -161,8 +199,7 @@ class trainer_view():
         lrlist = []
         [lrlist.append(p['lr']) for p in self.trainer.optimizer.param_groups]
         return lrlist[0]
-
-            
+        
     class Training_Display():
         def __init__(self, name='no name', nrows=1, ncols=1,update=None):
             self.fig, self.ax = plt.subplots(nrows,ncols)
@@ -171,3 +208,4 @@ class trainer_view():
                 
         def update(self):
             print('You need to define an update function in Training_Display objects.')
+            print('Look in trainer_plots.py to see examples of update functions.')
