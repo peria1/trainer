@@ -14,14 +14,7 @@ import torch
 import numpy as np
 #import torch.utils.data
 from torch import nn, optim
-#from torch.nn import functional as F
-#from torchvision import datasets, transforms
-#from torchvision.utils import save_image
-#import time
 from models import *
-#import trainer_view
-#import sys
-#sys.path.append('C:\\Users\\peria\\Desktop\\work\\Brent Lab\\Boucheron CNNs\\DLDBproject\\')
 from trainer_utils import kscirc, uichoosefile, date_for_filename, get_slash
 
 class trainer():
@@ -158,6 +151,8 @@ class trainer():
             print('should update!')
             self.viewer.set_update_flag(flag=True)
             self.viewer.update_displays()
+            self.viewer.arm_start_button()
+            
             torch.save(self.model.state_dict(), \
                        'saved_trained_states' + get_slash() + \
                        self.model.__class__.__name__ + \

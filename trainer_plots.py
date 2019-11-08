@@ -8,6 +8,8 @@ Created on Thu Nov  7 06:19:45 2019
 def basic_loss_plot(viewer,d):
     d.ax[0].plot(viewer.trainer.train_loss_history)
     d.ax[1].plot(viewer.trainer.test_loss_history)
+#    xlim = d.ax.get_xlim()
+#    d.ax[1].hlines(viewer.trainer.max_loss, xlim[0], xlim[1])
 
 def residual_plot(viewer,d):
     from trainer_utils import date_for_filename
@@ -16,4 +18,5 @@ def residual_plot(viewer,d):
         viewer.trainer.model(viewer.trainer.xtest).cpu().detach().numpy()
     d.ax.plot(viewer.trainer.yp, residuals,'o')
     d.ax.set_title(date_for_filename())
-    d.ax.hlines(0, min(viewer.trainer.yp),max(viewer.trainer.yp))
+    xlim = d.ax.get_xlim()
+    d.ax.hlines(0, xlim[0], xlim[1])

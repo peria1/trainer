@@ -51,19 +51,26 @@ class trainer_view():
         text_color = 'white'
         
         plt.figure(self.fig.number)
-        axbox = plt.axes([left_edge, 0.8, width, height]) # left, bottom, width, height
+        
+        axloss = plt.axes([left_edge, 0.8, width, height]) # left, bottom, width, height
+        self.loss_box = TextBox(axloss, 'Max Loss', \
+                              initial=str(1e30))
+        self.loss_box.on_submit(self.set_max_loss)
+        
+        
+        axbox = plt.axes([left_edge, 0.7, width, height]) 
         self.lr_box = TextBox(axbox, 'learning rate', \
                               initial=str(self.get_learning_rate()))
         self.lr_box.on_submit(self.set_learning_rate)
         
-        axbutton = plt.axes([left_edge, 0.7, width, height])
+        axbutton = plt.axes([left_edge, 0.6, width, height])
         self.start_button = Button(axbutton, 'Start')
         self.start_button.label.set_color(text_color)
         self.start_button.label.set_fontweight('bold')
         self.start_button.color = 'green'  # callback will toggle the color
         self.start_button.on_clicked(self.deal_with_start_button)
         
-        dispbutton = plt.axes([left_edge, 0.6, width, height])
+        dispbutton = plt.axes([left_edge, 0.5, width, height])
         self.disp_button = Button(dispbutton, 'Update Displays')
         self.disp_button.label.set_color(text_color)
         self.disp_button.label.set_fontweight('bold')
@@ -71,14 +78,14 @@ class trainer_view():
 #        self.disp_button.on_clicked(self.handle_update_button)
         self.disp_button.on_clicked(self.deal_with_update_button)
 
-        newbutton = plt.axes([left_edge, 0.5, width, height])
+        newbutton = plt.axes([left_edge, 0.4, width, height])
         self.new_button = Button(newbutton, 'New Display')
         self.new_button.label.set_color(text_color)
         self.new_button.label.set_fontweight('bold')
         self.new_button.color = 'black'
         self.new_button.on_clicked(self.add_display)
 
-        clearbutton = plt.axes([left_edge, 0.4, width, height])
+        clearbutton = plt.axes([left_edge, 0.3, width, height])
         self.clear_button = Button(clearbutton, 'Clear History')
         self.clear_button.label.set_color(text_color)
         self.clear_button.label.set_fontweight('bold')
@@ -115,6 +122,12 @@ class trainer_view():
     def add_display(self, event):
         pass
 
+    def set_max_loss(self, text):
+        try:
+            self.trainer.max_loss = float(text)
+        except:
+            print('Unable to set max loss to',text)
+                
     def set_learning_rate(self,text):
         try:
             self.trainer.optimizer = \
@@ -154,6 +167,10 @@ class trainer_view():
         else:
             print('How did this happen? Update button label is', label)
 
+    def arm_start_button(self):
+            self.start_button.label.set_text('Start')
+            self.start_button.color = 'green'
+        
 
     @fire_and_forget       # this enables training to run in background
     def call_trainer(self):
