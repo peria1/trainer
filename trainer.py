@@ -7,7 +7,7 @@ Created on Mon Oct 14 14:28:42 2019
 
 
 
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 #import argparse
 #import itertools
 import torch
@@ -18,7 +18,7 @@ from models import *
 from trainer_utils import kscirc, uichoosefile, date_for_filename, get_slash
 
 class trainer():
-    def __init__(self, trainee_class,max_loss=None,reload=False, \
+    def __init__(self, trainee_class, max_loss=None, reload=False, \
                  viewer=None, **kwargs):
         #
         # Given the name of a trainee class, trainer.__init__ will instantiate that 
@@ -101,6 +101,8 @@ class trainer():
         xtest, ytest = self.xtest, self.ytest
         _, yp = self.xp, self.yp
         done = False
+        tests_since_update = 0
+        display_update_delay = 10 #  only update after this many tests
         while not (done or self.pause):
             x,y = self.get_more_data()
             for i in range(ppb):
@@ -139,15 +141,15 @@ class trainer():
             elif self.pause:
                 loss_str = loss_str + '   paused.'
             
-            if not self.viewer:
-                print(loss_str)
-            else:
+            if self.viewer:
                 self.viewer.ax.set_title(str(loss_str))
                 self.viewer.fig.canvas.draw()
                 self.viewer.fig.canvas.flush_events()
-
-                self.viewer.update_displays()
- 
+                tests_since_update = (tests_since_update + 1) % display_update_delay 
+                if tests_since_update == 0:
+                    self.viewer.update_displays()
+            else:
+                print(loss_str)
                            
         if done:
             print('should update!')

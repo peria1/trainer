@@ -107,7 +107,7 @@ class linreg(nn.Module):
         while n > 2:
             self.layer_list.append(nn.Linear(n,n//2))
             n//=2
-            
+        self.leaky = nn.LeakyReLU()
 #        self.L1 = nn.Linear(npts, 2*npts)
 #        self.L2 = nn.Linear(2*npts, 2*npts)
 #        self.L3 = nn.Linear(2*npts, 2*npts)
@@ -126,7 +126,7 @@ class linreg(nn.Module):
     def forward(self, xy):
         dataflow = xy
         for L in self.layer_list:
-            dataflow = torch.relu(L(dataflow))
+            dataflow = self.leaky(L(dataflow))
         
         return dataflow
         
@@ -194,11 +194,13 @@ class prop(nn.Module):
         while n >= 2:
             self.layer_list.append(nn.Linear(n,n//2))
             n//=2
+            
+        self.leaky = nn.LeakyReLU()
 
     def forward(self, xy):
         dataflow = xy
         for L in self.layer_list:
-            dataflow = torch.relu(L(dataflow))
+            dataflow = self.leaky(L(dataflow))
         
         return dataflow
         
@@ -348,6 +350,8 @@ class inner_prod(nn.Module):
     def __init__(self, npts=None, nbatch=None):  # trying to see if machine can tell that y is the sum over x 
         super(inner_prod, self).__init__()
 
+        self.custom_loss = nn.L1Loss()
+        
         if npts is None:
             npts = 50
         if nbatch is None:
@@ -367,18 +371,21 @@ class inner_prod(nn.Module):
         self.Llast = nn.Linear(width_factor*npts, npts)
         
         self.weight_vector = nn.Linear(npts, 1) # npts is the size of each 1D example
-                
+        
+        self.leaky = nn.LeakyReLU()
+
+        
     def forward(self, x):
         dataflow = x
 #        dataflow = self.bn1(x)
-        dataflow = torch.relu(self.L1(dataflow))
-        dataflow = torch.relu(self.L2(dataflow))
-        dataflow = torch.relu(self.L3(dataflow))
-        dataflow = torch.relu(self.L4(dataflow))
-        dataflow = torch.relu(self.L5(dataflow))
-        dataflow = torch.relu(self.L6(dataflow))
-        dataflow = torch.relu(self.L7(dataflow))
-        dataflow = torch.relu(self.Llast(dataflow))
+        dataflow = self.leaky(self.L1(dataflow))
+        dataflow = self.leaky(self.L2(dataflow))
+        dataflow = self.leaky(self.L3(dataflow))
+        dataflow = self.leaky(self.L4(dataflow))
+        dataflow = self.leaky(self.L5(dataflow))
+        dataflow = self.leaky(self.L6(dataflow))
+        dataflow = self.leaky(self.L7(dataflow))
+        dataflow = self.leaky(self.Llast(dataflow))
         result = torch.squeeze(self.weight_vector(dataflow))
         return result
        
