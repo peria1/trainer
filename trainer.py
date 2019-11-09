@@ -15,10 +15,12 @@ import numpy as np
 #import torch.utils.data
 from torch import nn, optim
 from models import *
+from problems import *
 from trainer_utils import kscirc, uichoosefile, date_for_filename, get_slash
 
 class trainer():
-    def __init__(self, trainee_class, max_loss=None, reload=False, \
+    def __init__(self, trainee_class, problem_class, \
+                 max_loss=None, reload=False, \
                  viewer=None, **kwargs):
         #
         # Given the name of a trainee class, trainer.__init__ will instantiate that 
@@ -34,7 +36,10 @@ class trainer():
         trainee = trainee_class(**kwargs).to(self.device)
         self.model = trainee # a trainee needs an optimzer and a criterion, 
                                            #   as well as a way to generate data.
-                                           
+        self.problem = problem_class(**kwargs)
+                   
+        self.data_generator = self.problem.get_input_and_target
+                            
         self.model.to(self.device)
         if viewer:
             self.viewer = viewer
@@ -48,7 +53,7 @@ class trainer():
         if reload:  # does not work on Windows, can't get Tk to work
             self.model.load_state_dict(torch.load(uichoosefile()))
                                            
-        self.xtest, self.ytest = self.model.get_xy_batch()
+        self.xtest, self.ytest = self.data_generator()
         self.xtest = self.xtest.to(self.device)
         self.ytest = self.ytest.to(self.device)
         
@@ -57,6 +62,8 @@ class trainer():
             assert(self.model(self.xtest).size()==self.ytest.size())
         except AssertionError:
             print('Model predictons need to have the same dimensions as the targets.')
+            print('Prediction: ', self.model(self.xtest).size())
+            print('Target: ', self.ytest.size())
             return
         
         if 'custom_loss' in dir(self.model):
@@ -166,7 +173,7 @@ class trainer():
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
     def get_more_data(self):
-        x,y = self.model.get_xy_batch()
+        x,y = self.data_generator()
         return x.to(self.device), y.to(self.device)
     
     def zap_history(self):
@@ -177,4 +184,8 @@ class trainer():
     def get_model_name(self):
         func_rep = str(self.model)
         return func_rep[0:func_rep.find('(')]
+
+    def get_problem_name(self):
+        func_rep = str(self.problem)
+        return func_rep[func_rep.find('.')+1:func_rep.find('object')-1]
      

@@ -8,6 +8,7 @@ Created on Mon Oct 21 06:16:10 2019
 import matplotlib.pyplot as plt
 import trainer as tr
 from models import *
+from problems import *
 from trainer_utils import date_for_filename
 from matplotlib.widgets import TextBox, Button
 import trainer_plots as tp

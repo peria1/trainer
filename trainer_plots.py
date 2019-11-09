@@ -7,7 +7,7 @@ Created on Thu Nov  7 06:19:45 2019
 
 def basic_loss_plot(viewer,d):
     d.ax[0].plot(viewer.trainer.train_loss_history)
-    d.ax[0].set_title(viewer.trainer.get_model_name() +': training loss')
+    d.ax[0].set_title(viewer.trainer.get_problem_name() +': training loss')
     d.ax[1].plot(viewer.trainer.test_loss_history)
     d.ax[1].set_title('test loss')
     ylim = d.ax[1].get_ylim()
@@ -22,7 +22,7 @@ def residual_plot(viewer,d):
     residuals = viewer.trainer.yp - \
         viewer.trainer.model(viewer.trainer.xtest).cpu().detach().numpy()
     d.ax.plot(viewer.trainer.yp, residuals,'o')
-    title_str = viewer.trainer.get_model_name() + \
+    title_str = viewer.trainer.get_problem_name() + \
         ': target minus prediction versus target'
     d.ax.set_title(title_str)
     xlim = d.ax.get_xlim()
