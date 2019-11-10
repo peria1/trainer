@@ -14,7 +14,7 @@ Created on Sun Oct  6 07:32:17 2019
 
 """
 import torch
-import numpy as np
+#import numpy as np
 import torch.utils.data
 from torch import nn
 

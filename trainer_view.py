@@ -31,7 +31,9 @@ class trainer_view():
         self.fig.canvas.mpl_disconnect(self.fig.canvas.manager.key_press_handler_id)       
         self.fig.canvas.mpl_connect('key_press_event', self.process_key) 
         self.fig.canvas.mpl_connect('button_press_event', self.process_button) 
-        
+        self.fig.canvas.mpl_connect('close_event', self.close_it_down)
+
+#        self.fig.canvas.manager.window.raise_()
 #        self.displays = [loss_graph]
         
         self.trainer = tr.trainer(*args, **kwargs, viewer=self)
@@ -96,11 +98,10 @@ class trainer_view():
     def clear_history(self,event):
         self.trainer.zap_history()
     
-#    def handle_update_button(self, event):
-#        self.event = event
-#        dir(event)
-#        self.set_update_flag()
-#        
+    def close_it_down(self,event):
+        for d in self.displays:
+            plt.close(d.fig)
+
     def set_update_flag(self, flag=True):
         if flag is True:
             print('setting update flag to True...')
@@ -158,7 +159,7 @@ class trainer_view():
         label = self.disp_button.label.get_text()
         if label == 'Update Displays':
             self.set_update_flag(flag=True)
-            # Grt ready to Pause next time button is pushed. 
+            # Get ready to Pause next time button is pushed. 
             self.disp_button.label.set_text('Pause Displays')
             self.disp_button.color = 'red'
         elif label == 'Pause Displays':

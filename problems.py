@@ -230,4 +230,32 @@ class x0_dot_x1(Problem):  # moved to n_double_one
         xdotx = torch.from_numpy(xdotx).to(torch.float)
         return x,xdotx
  
+class y_linear_with_x(Problem):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        
+    def get_input_and_target(self):
+        nbatch = self.nbatch
+        npts = self.npts
+        
+        xsize = (nbatch,npts)
+#        half = int(npts/2)
+        
+        xrange = 20.0
+        sloperange = 10.0
+        offsetrange = 10.0
+        
+        noiseamp = np.random.uniform(low=1.0, high = 10*xrange, size=(nbatch,1))
+        noise = np.random.normal(scale=noiseamp,size=xsize)
+       
+        slope = np.random.uniform(-sloperange,sloperange,size=(nbatch,1))
+        offset = np.random.uniform(-offsetrange,offsetrange,size=(nbatch,1))
+        
+        x = np.random.uniform(low=-xrange, high=xrange, size=xsize)
+        y = (x-offset)* slope
+        x = x + noise
 
+        x = torch.from_numpy(x).to(torch.float)
+        y = torch.from_numpy(y).to(torch.float)
+        return x, y
+        

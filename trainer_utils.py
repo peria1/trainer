@@ -339,3 +339,33 @@ def getnum(prompt=None, default=None):
         return None
         
     return n
+
+
+def get_all_problem_names(filename):
+    if not filename:
+        filename = 'problems.py'
+        
+    with open(filename,'r') as f:
+        classes = []
+        for line in f:
+            if line.lstrip()[0:6] == 'class ' and \
+               line.find('(Problem)') > 0:
+                classes.append( \
+                line[line.find('class')+6:line.find('(')])
+    return classes
+
+def get_all_model_names(filename):
+    if not filename:
+        filename = 'models.py'
+        
+    with open(filename,'r') as f:
+        classes = []
+        for line in f:
+            if line.lstrip()[0:6] == 'class ':
+                classes.append( \
+                line[line.find('class')+6:line.find('(')])
+    return classes
+
+
+
+
