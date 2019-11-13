@@ -18,6 +18,44 @@ import torch
 import torch.utils.data
 from torch import nn
 
+class opp_cos(nn.Module):
+    def __init__(self, npts=None, nbatch=None):
+        super(opp_cos, self).__init__()
+        
+        if npts is None:
+            self.npts = 50
+        if nbatch is None:
+            self.nbatch = 128
+
+        print(self.npts)
+        
+        self.L1 = nn.Linear(self.npts,self.npts*2)
+        self.L2 = nn.Linear(self.npts*2,self.npts*2)
+        self.L3 = nn.Linear(self.npts*2,self.npts)
+        self.leaky = nn.LeakyReLU()
+    
+    def forward(self,x):
+        dataflow = self.leaky(self.L1(x))
+        dataflow = self.leaky(self.L2(dataflow))
+        dataflow = self.leaky(self.L3(dataflow))
+        
+        return dataflow
+    
+    def get_xy_batch(self):
+        nbatch = self.nbatch
+        npts = self.npts
+        
+        x = np.random.normal(size=(nbatch,npts))
+        x = np.cos(x)
+        x = torch.from_numpy(x)
+        x = x.to(torch.float32)
+    
+        y = -x.to(torch.float32)
+        
+        return x,y
+   
+
+
 class one_linear_layer(nn.Module):
     def __init__(self, npts=None, nbatch=None):
         super(one_linear_layer, self).__init__()
