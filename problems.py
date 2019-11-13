@@ -37,6 +37,30 @@ class Problem():
         print('You must define your data generator.')
         return None
 
+
+class opp_cos(Problem): # target is opposite of cosine of input. Why not? 
+                        #   But see below!
+    def __init__(self, npts=None, nbatch=None):
+        super().__init__()
+
+    def get_input_and_target(self):
+        nbatch = self.nbatch
+        npts = self.npts
+        #
+        # The following really just limits the range of x, and then flips the 
+        #    sign, to generate y. 
+        #
+        x = np.random.normal(size=(nbatch,npts))
+        x = np.cos(x)
+        x = torch.from_numpy(x)
+        x = x.to(torch.float32)
+    
+        y = -x.to(torch.float32)
+        
+        return x,y
+   
+
+
 class plain_sum_of_x(Problem):
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
