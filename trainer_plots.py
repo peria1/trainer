@@ -7,7 +7,7 @@ Created on Thu Nov  7 06:19:45 2019
 
 def basic_loss_plot(viewer,d):
     d.ax[0].plot(viewer.trainer.train_loss_history)
-    d.ax[0].set_title('training loss')
+    d.ax[0].set_title(viewer.trainer.get_problem_name() +': training loss')
     d.ax[1].plot(viewer.trainer.test_loss_history)
     d.ax[1].set_title('test loss')
     ylim = d.ax[1].get_ylim()
@@ -22,6 +22,28 @@ def residual_plot(viewer,d):
     residuals = viewer.trainer.yp - \
         viewer.trainer.model(viewer.trainer.xtest).cpu().detach().numpy()
     d.ax.plot(viewer.trainer.yp, residuals,'o')
-    d.ax.set_title('target minus prediction versus target')
+    title_str = viewer.trainer.get_problem_name() + \
+        ': target minus prediction versus target'
+    d.ax.set_title(title_str)
     xlim = d.ax.get_xlim()
     d.ax.hlines(0, xlim[0], xlim[1])
+    
+def weight_plot(viewer, d):
+    if d.first:
+        print('first time in weight plot...')
+        d.first = False
+        d.plist = viewer.trainer.get_named_weight_list()
+        print('first time stuff is done')
+        
+    if len(d.plist) == 1:
+        im = d.plist[0][1].cpu().detach().numpy()
+        d.ax.imshow(im)
+#        d.ax.set_title([0])
+    else:
+        for i,a in enumerate(d.ax.flatten()):
+            im = d.plist[i][1].cpu().detach().numpy()
+            a.imshow(im)
+            
+    
+
+    

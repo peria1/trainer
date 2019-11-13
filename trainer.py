@@ -7,7 +7,7 @@ Created on Mon Oct 14 14:28:42 2019
 
 
 
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 #import argparse
 #import itertools
 import torch
@@ -15,10 +15,12 @@ import numpy as np
 #import torch.utils.data
 from torch import nn, optim
 from models import *
+from problems import *
 from trainer_utils import kscirc, uichoosefile, date_for_filename, get_slash
 
 class trainer():
-    def __init__(self, trainee_class,max_loss=None,reload=False, \
+    def __init__(self, trainee_class, problem_class, \
+                 max_loss=None, reload=False, \
                  viewer=None, **kwargs):
         #
         # Given the name of a trainee class, trainer.__init__ will instantiate that 
@@ -34,7 +36,10 @@ class trainer():
         trainee = trainee_class(**kwargs).to(self.device)
         self.model = trainee # a trainee needs an optimzer and a criterion, 
                                            #   as well as a way to generate data.
-                                           
+        self.problem = problem_class(**kwargs)
+                   
+        self.data_generator = self.problem.get_input_and_target
+                            
         self.model.to(self.device)
         if viewer:
             self.viewer = viewer
@@ -47,16 +52,18 @@ class trainer():
 #        print('trainer device is ',self.device)
         if reload:  # does not work on Windows, can't get Tk to work
             self.model.load_state_dict(torch.load(uichoosefile()))
-                                           
-        self.xtest, self.ytest = self.model.get_xy_batch()
+                     
+        self.xtest, self.ytest = self.data_generator()
         self.xtest = self.xtest.to(self.device)
         self.ytest = self.ytest.to(self.device)
-        
+
 
         try:
             assert(self.model(self.xtest).size()==self.ytest.size())
         except AssertionError:
             print('Model predictons need to have the same dimensions as the targets.')
+            print('Prediction: ', self.model(self.xtest).size())
+            print('Target: ', self.ytest.size())
             return
         
         if 'custom_loss' in dir(self.model):
@@ -101,6 +108,8 @@ class trainer():
         xtest, ytest = self.xtest, self.ytest
         _, yp = self.xp, self.yp
         done = False
+        tests_since_update = 0
+        display_update_delay = 10 #  only update after this many tests
         while not (done or self.pause):
             x,y = self.get_more_data()
             for i in range(ppb):
@@ -139,15 +148,19 @@ class trainer():
             elif self.pause:
                 loss_str = loss_str + '   paused.'
             
-            if not self.viewer:
-                print(loss_str)
-            else:
+            if self.viewer:
                 self.viewer.ax.set_title(str(loss_str))
-                self.viewer.fig.canvas.draw()
+                try:
+                    self.viewer.fig.canvas.draw()
+                except AttributeError:
+                    print('viewer.fig type is',type(self.viewer.fig))
+                    print('Why is this a problem?')
                 self.viewer.fig.canvas.flush_events()
-
-                self.viewer.update_displays()
- 
+                tests_since_update = (tests_since_update + 1) % display_update_delay 
+                if tests_since_update == 0:
+                    self.viewer.update_displays()
+            else:
+                print(loss_str)
                            
         if done:
             print('should update!')
@@ -164,7 +177,7 @@ class trainer():
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
     def get_more_data(self):
-        x,y = self.model.get_xy_batch()
+        x,y = self.data_generator()
         return x.to(self.device), y.to(self.device)
     
     def zap_history(self):
@@ -175,4 +188,10 @@ class trainer():
     def get_model_name(self):
         func_rep = str(self.model)
         return func_rep[0:func_rep.find('(')]
+
+    def get_problem_name(self):
+        func_rep = str(self.problem)
+        return func_rep[func_rep.find('.')+1:func_rep.find('object')-1]
      
+    def get_named_weight_list(self):
+        return [(n,p) for (n,p) in self.model.named_parameters() if '.weight' in n]
