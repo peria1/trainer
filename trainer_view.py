@@ -47,7 +47,6 @@ class trainer_view():
                          self.Training_Display(name='residuals',\
                                                update=tp.residual_plot) ,\
                          self.Training_Display(name='weights',\
-                                               nplots = len(self.trainer.get_named_weight_list()),\
                                                update=tp.weight_plot)]
 
         # Button layout, for a column at the right-hand side of window. 
@@ -196,10 +195,11 @@ class trainer_view():
         elif event.key == 'g':
             self.update_plot = True
         else:
-            print(event.key,'??!')
+            pass
 
     def process_button(self, event): 
-        print("Button:", event.x, event.y, event.xdata, event.ydata, event.button) 
+        pass
+#        print("Button:", event.x, event.y, event.xdata, event.ydata, event.button) 
 
     def get_learning_rate(self):
         lrlist = []

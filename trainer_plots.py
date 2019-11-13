@@ -30,20 +30,41 @@ def residual_plot(viewer,d):
     
 def weight_plot(viewer, d):
     if d.first:
-        print('first time in weight plot...')
-        d.first = False
-        d.plist = viewer.trainer.get_named_weight_list()
-        print('first time stuff is done')
+        import matplotlib.pyplot as plt
+        from matplotlib.widgets import RadioButtons
         
+        d.first = False
+        
+        d.plist = viewer.trainer.get_named_weight_list()
+        d.names = [n for n,p in d.plist]
+        axcolor = 'lightgoldenrodyellow'
+        plt.figure(d.fig.number);
+        plt.subplots_adjust(left=0.4)        
+        rax = plt.axes([0.05, 0.05, 0.15, 0.9], facecolor=axcolor)
+        d.radio = RadioButtons(rax, d.names)
+        d.layer_to_show = 0
+        def set_layer(event):
+            d.layer_to_show =\
+            [i for i,n in enumerate(d.names) if event in n]
+            try:
+                assert len(d.layer_to_show)==1
+            except AssertionError:
+                print('More than one layer matches',event,'. Figure this out!')
+            d.layer_to_show = d.layer_to_show[0]
+            
+        d.radio.on_clicked(set_layer)
+
     if len(d.plist) == 1:
         im = d.plist[0][1].cpu().detach().numpy()
         d.ax.imshow(im)
-#        d.ax.set_title([0])
     else:
-        for i,a in enumerate(d.ax.flatten()):
-            im = d.plist[i][1].cpu().detach().numpy()
-            a.imshow(im)
-            
+        im = d.plist[d.layer_to_show][1].cpu().detach().numpy()
+        d.ax.imshow(im)
+        d.ax.set_title(d.names[d.layer_to_show])
+#        for i,a in enumerate(d.ax.flatten()):
+#            im = d.plist[i][1].cpu().detach().numpy()
+#            a.imshow(im)
+#            
     
 
     
