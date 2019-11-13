@@ -27,3 +27,23 @@ def residual_plot(viewer,d):
     d.ax.set_title(title_str)
     xlim = d.ax.get_xlim()
     d.ax.hlines(0, xlim[0], xlim[1])
+    
+def weight_plot(viewer, d):
+    if d.first:
+        print('first time in weight plot...')
+        d.first = False
+        d.plist = viewer.trainer.get_named_weight_list()
+        print('first time stuff is done')
+        
+    if len(d.plist) == 1:
+        im = d.plist[0][1].cpu().detach().numpy()
+        d.ax.imshow(im)
+#        d.ax.set_title([0])
+    else:
+        for i,a in enumerate(d.ax.flatten()):
+            im = d.plist[i][1].cpu().detach().numpy()
+            a.imshow(im)
+            
+    
+
+    

@@ -52,7 +52,8 @@ class trainer():
 #        print('trainer device is ',self.device)
         if reload:  # does not work on Windows, can't get Tk to work
             self.model.load_state_dict(torch.load(uichoosefile()))
-                                           
+                     
+        print('HELLO',self.data_generator)                      
         self.xtest, self.ytest = self.data_generator()
         self.xtest = self.xtest.to(self.device)
         self.ytest = self.ytest.to(self.device)
@@ -150,7 +151,11 @@ class trainer():
             
             if self.viewer:
                 self.viewer.ax.set_title(str(loss_str))
-                self.viewer.fig.canvas.draw()
+                try:
+                    self.viewer.fig.canvas.draw()
+                except AttributeError:
+                    print('viewer.fig type is',type(self.viewer.fig))
+                    print('Why is this a problem?')
                 self.viewer.fig.canvas.flush_events()
                 tests_since_update = (tests_since_update + 1) % display_update_delay 
                 if tests_since_update == 0:
@@ -189,3 +194,5 @@ class trainer():
         func_rep = str(self.problem)
         return func_rep[func_rep.find('.')+1:func_rep.find('object')-1]
      
+    def get_named_weight_list(self):
+        return [(n,p) for (n,p) in self.model.named_parameters() if '.weight' in n]

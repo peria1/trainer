@@ -366,6 +366,33 @@ def get_all_model_names(filename):
                 line[line.find('class')+6:line.find('(')])
     return classes
 
+def best_square(n):
+    from sympy import factorint
+    import itertools 
+            
+    if n == 1:
+        return 1,1
+    
+    # find nearly square factors to cover depth
+    pfd = factorint(n)  # the prime factors of ndepth, which is the number of feature maps
+    f = []
+    for key,val in pfd.items():   # pfd is a dictionary of factors and number of times they 
+        f.append([key]*val)       # occur, e.g. 24 -> {{2,3},{3,1}} . So expand it.... 
+    f=list(itertools.chain.from_iterable(f))  #...and then flatten it. 
+    f.sort()
+
+    prod = 1
+    pmax = int(n**0.5)
+    print(f)
+    for pf in f:
+        if prod*pf <= pmax:
+            prod *= pf
+        else:
+            nrows = prod
+            ncols = n // nrows
+            break
+        
+    return nrows, ncols
 
 
 

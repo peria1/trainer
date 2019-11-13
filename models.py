@@ -32,6 +32,20 @@ class one_linear_layer(nn.Module):
     def forward(self,x):
         return torch.squeeze(self.L1(x))
 
+class one_linear_layer_to_n(nn.Module):
+    def __init__(self, npts=None, nbatch=None):
+        super().__init__()
+
+        if npts is None:
+            self.npts = 50
+        if nbatch is None:
+            self.nbatch = 128
+        
+        self.L1 = nn.Linear(self.npts,self.npts)
+       
+    def forward(self,x):
+        return torch.squeeze(self.L1(x))
+
      
 class bisect_to_one(nn.Module):
     def __init__(self, npts=None, nbatch=None):  # trying to see if machine can tell that y is the sum over x 
