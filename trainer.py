@@ -53,11 +53,10 @@ class trainer():
         if reload:  # does not work on Windows, can't get Tk to work
             self.model.load_state_dict(torch.load(uichoosefile()))
                      
-        print('HELLO',self.data_generator)                      
         self.xtest, self.ytest = self.data_generator()
         self.xtest = self.xtest.to(self.device)
         self.ytest = self.ytest.to(self.device)
-        
+
 
         try:
             assert(self.model(self.xtest).size()==self.ytest.size())

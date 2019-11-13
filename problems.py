@@ -67,7 +67,6 @@ class quad_sum_of_x(Problem):
         x = torch.from_numpy(np.random.uniform(-xrange,xrange,size=(nbatch,npts))).to(torch.float32)
         y = torch.sum(x.pow(2),1).pow(0.5)
         y = torch.reshape(y,(nbatch,1))
-        print('noise size is ',noise.size())
     
         y = y + noise.reshape((nbatch,1))
         return x,y
