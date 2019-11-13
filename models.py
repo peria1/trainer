@@ -14,7 +14,7 @@ Created on Sun Oct  6 07:32:17 2019
 
 """
 import torch
-#import numpy as np
+import numpy as np
 import torch.utils.data
 from torch import nn
 
@@ -41,7 +41,7 @@ class opp_cos(nn.Module):
         
         return dataflow
     
-    def get_xy_batch(self):
+    def get_input_and_target(self):
         nbatch = self.nbatch
         npts = self.npts
         
