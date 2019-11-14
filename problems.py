@@ -7,7 +7,6 @@ Created on Sat Nov  9 07:31:52 2019
 import torch
 import numpy as np
 import torch.utils.data
-from torch import nn
 """
 The superclass Problem takes care of things common to all of our "math 
     problem" data sets, like default dimensions and the requirement to 

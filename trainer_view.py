@@ -106,7 +106,6 @@ class trainer_view():
 
     def set_update_flag(self, flag=True):
         if flag is True:
-            print('setting update flag to True...')
             self.update_plots = True
         else:
             self.update_plots = False

@@ -39,7 +39,8 @@ def weight_plot(viewer, d):
         d.names = [n for n,p in d.plist]
         axcolor = 'lightgoldenrodyellow'
         plt.figure(d.fig.number);
-        plt.subplots_adjust(left=0.4)        
+        plt.subplots_adjust(left=0.4)
+        d.ax.set_axis_off()
         rax = plt.axes([0.05, 0.05, 0.15, 0.9], facecolor=axcolor)
         d.radio = RadioButtons(rax, d.names)
         d.layer_to_show = 0
@@ -53,18 +54,23 @@ def weight_plot(viewer, d):
             d.layer_to_show = d.layer_to_show[0]
             
         d.radio.on_clicked(set_layer)
+        d.plt = plt
+        d.cbar_axis = d.plt.axes([0.25, 0.05, 0.05, 0.9])
 
-    if len(d.plist) == 1:
+    if len(d.plist) == 1:  # This is vestigial now, I think. Only making 1 plot
         im = d.plist[0][1].cpu().detach().numpy()
-        d.ax.imshow(im)
+        d.mappable = d.ax.imshow(im)
     else:
         im = d.plist[d.layer_to_show][1].cpu().detach().numpy()
-        d.ax.imshow(im)
+        d.mappable = d.ax.imshow(im)
         d.ax.set_title(d.names[d.layer_to_show])
-#        for i,a in enumerate(d.ax.flatten()):
+#
+#  Used to show all plots at once. 
+#        for i,a in enumerate(d.ax.flatten()):  
 #            im = d.plist[i][1].cpu().detach().numpy()
 #            a.imshow(im)
 #            
-    
+    d.cbar_axis.clear()
+    d.plt.colorbar(mappable=d.mappable, cax=d.cbar_axis)
 
     

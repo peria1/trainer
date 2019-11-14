@@ -14,7 +14,6 @@ Created on Sun Oct  6 07:32:17 2019
 
 """
 import torch
-import numpy as np
 import torch.utils.data
 from torch import nn
 
@@ -191,7 +190,7 @@ class n_double_one_tanh(nn.Module):    # moved to n_double_one_tanh
         dataflow = torch.relu(self.L6(dataflow))
         dataflow = torch.relu(self.L7(dataflow))
         dataflow = torch.relu(self.Llast(dataflow))
-        dataflow = torch.squeeze(self.weight_vector(dataflow))
+        dataflow = self.weight_vector(dataflow)
         result = torch.tanh(dataflow)
         return result
 
