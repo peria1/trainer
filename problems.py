@@ -219,7 +219,7 @@ class x0_corr_x1(Problem):    # moved to n_double_one_tanh
             r[i] = np.corrcoef(x[i,0:half], y=x[i,half:])[0,1]
 
         x = torch.from_numpy(x).to(torch.float)
-        r = torch.from_numpy(r).to(torch.float)
+        r = torch.from_numpy(r).to(torch.float).reshape((nbatch,1))
         return x,r
 
  

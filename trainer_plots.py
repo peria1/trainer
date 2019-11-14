@@ -23,7 +23,7 @@ def residual_plot(viewer,d):
         viewer.trainer.model(viewer.trainer.xtest).cpu().detach().numpy()
     d.ax.plot(viewer.trainer.yp, residuals,'o')
     title_str = viewer.trainer.get_problem_name() + \
-        ': target minus prediction versus target'
+        ': target minus prediction vs. target'
     d.ax.set_title(title_str)
     xlim = d.ax.get_xlim()
     d.ax.hlines(0, xlim[0], xlim[1])
@@ -32,9 +32,7 @@ def weight_plot(viewer, d):
     if d.first:
         import matplotlib.pyplot as plt
         from matplotlib.widgets import RadioButtons
-        
-        d.first = False
-        
+                
         d.plist = viewer.trainer.get_named_weight_list()
         d.names = [n for n,p in d.plist]
         axcolor = 'lightgoldenrodyellow'
@@ -43,8 +41,9 @@ def weight_plot(viewer, d):
         d.ax.set_axis_off()
         rax = plt.axes([0.05, 0.05, 0.15, 0.9], facecolor=axcolor)
         d.radio = RadioButtons(rax, d.names)
+
         d.layer_to_show = 0
-        def set_layer(event):
+        def set_layer_and_update(event):
             d.layer_to_show =\
             [i for i,n in enumerate(d.names) if event in n]
             try:
@@ -52,25 +51,33 @@ def weight_plot(viewer, d):
             except AssertionError:
                 print('More than one layer matches',event,'. Figure this out!')
             d.layer_to_show = d.layer_to_show[0]
-            
-        d.radio.on_clicked(set_layer)
+            if not d.first:
+                d.update(viewer,d)
+                
+        d.radio.on_clicked(set_layer_and_update)
         d.plt = plt
         d.cbar_axis = d.plt.axes([0.25, 0.05, 0.05, 0.9])
+        d.first = False
 
-    if len(d.plist) == 1:  # This is vestigial now, I think. Only making 1 plot
-        im = d.plist[0][1].cpu().detach().numpy()
-        d.mappable = d.ax.imshow(im)
-    else:
-        im = d.plist[d.layer_to_show][1].cpu().detach().numpy()
-        d.mappable = d.ax.imshow(im)
-        d.ax.set_title(d.names[d.layer_to_show])
-#
-#  Used to show all plots at once. 
-#        for i,a in enumerate(d.ax.flatten()):  
-#            im = d.plist[i][1].cpu().detach().numpy()
-#            a.imshow(im)
-#            
+    im = d.plist[d.layer_to_show][1].cpu().detach().numpy()
+    d.ax.set_axis_off()
+    d.mappable = d.ax.imshow(im)
+    d.ax.set_title(d.names[d.layer_to_show])
     d.cbar_axis.clear()
     d.plt.colorbar(mappable=d.mappable, cax=d.cbar_axis)
+    d.fig.canvas.draw()
+    d.fig.canvas.flush_events()
+    
+#def example_plot(viewer, d):
+#    if d.first:
+#        import numpy as np
+#        d.np = np
+#        predsize = viewer.trainer.yp.shape
+#        d.n_examples = predsize[0]
+#        
+##    pick = int(d.np.random.uniform(0,d.n_examples,size=(1)))
+#    pred = 
+#    d.ax.plot()
+#    
 
     
