@@ -226,7 +226,16 @@ class trainer_view():
         with PdfPages(report_file) as pdf:
             pdf.savefig(self.fig)   # First page is the controller window,
             for d in self.displays:  #  then all the displays in order. 
-                pdf.savefig(d.fig)
+                if 'layer_names' in dir(d):
+                    curr_layer = d.layer_to_show
+                    for i,ln in enumerate(d.layer_names):
+                        d.layer_to_show = i
+                        d.update(self, d)
+                        pdf.savefig(d.fig)
+                    d.layer_to_show = curr_layer
+                    d.update(self, d)
+                else:
+                    pdf.savefig(d.fig)
     
     class Training_Display():
         def __init__(self, name='no name', nrows=1, ncols=1, nplots=None, update=None):

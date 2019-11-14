@@ -34,18 +34,18 @@ def weight_plot(viewer, d):
         from matplotlib.widgets import RadioButtons
                 
         d.plist = viewer.trainer.get_named_weight_list()
-        d.names = [n for n,p in d.plist]
+        d.layer_names = [n for n,p in d.plist]
         axcolor = 'lightgoldenrodyellow'
         plt.figure(d.fig.number);
         plt.subplots_adjust(left=0.4)
         d.ax.set_axis_off()
         rax = plt.axes([0.05, 0.05, 0.15, 0.9], facecolor=axcolor)
-        d.radio = RadioButtons(rax, d.names)
+        d.radio = RadioButtons(rax, d.layer_names)
 
         d.layer_to_show = 0
         def set_layer_and_update(event):
             d.layer_to_show =\
-            [i for i,n in enumerate(d.names) if event in n]
+            [i for i,n in enumerate(d.layer_names) if event in n]
             try:
                 assert len(d.layer_to_show)==1
             except AssertionError:
@@ -62,7 +62,7 @@ def weight_plot(viewer, d):
     im = d.plist[d.layer_to_show][1].cpu().detach().numpy()
     d.ax.set_axis_off()
     d.mappable = d.ax.imshow(im)
-    d.ax.set_title(d.names[d.layer_to_show])
+    d.ax.set_title(d.layer_names[d.layer_to_show])
     d.cbar_axis.clear()
     d.plt.colorbar(mappable=d.mappable, cax=d.cbar_axis)
     d.fig.canvas.draw()
