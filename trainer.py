@@ -18,6 +18,8 @@ from models import *
 from problems import *
 from trainer_utils import kscirc, uichoosefile, date_for_filename, get_slash
 
+
+
 class trainer():
     def __init__(self, trainee_class, problem_class, \
                  max_loss=None, reload=False, \
@@ -83,7 +85,7 @@ class trainer():
         self.yp = self.ytest.cpu().detach().numpy()  #  testing in numpy rather than torch. 
 
         self.zap_history()        
-        
+
     def train_step(self, input, target):
         self.model.train()  # make sure model is in training mode
         

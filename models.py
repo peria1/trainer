@@ -189,7 +189,7 @@ class n_double_one_tanh(nn.Module):    # moved to n_double_one_tanh
         dataflow = torch.relu(self.L4(dataflow))
         dataflow = torch.relu(self.L5(dataflow))
         dataflow = torch.relu(self.L6(dataflow))
-        dataflow = torch.relu(self.L7(dataflow))
+        dataflow = torch.relu(self.L7(dataflow))        
         dataflow = torch.relu(self.Llast(dataflow))
         dataflow = torch.squeeze(self.weight_vector(dataflow))
         result = torch.tanh(dataflow)

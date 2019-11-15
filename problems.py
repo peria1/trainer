@@ -37,6 +37,28 @@ class Problem():
         print('You must define your data generator.')
         return None
 
+class x_double_x(Problem): # target the input squared
+                        #   But see below!
+    def __init__(self, npts=None, nbatch=None):
+        super().__init__()
+
+    def get_input_and_target(self):
+        nbatch = self.nbatch
+        npts = self.npts
+        #
+        # The following really just limits the range of x, and then flips the 
+        #    sign, to generate y. 
+        #
+        x = np.random.normal(size=(nbatch,npts))
+        x = np.cos(x)
+        x = torch.from_numpy(x)
+        x = x.to(torch.float32)
+    
+        y = x*x
+        y = y.to(torch.float32)
+        
+        return x,y
+   
 
 class opp_cos(Problem): # target is opposite of cosine of input. Why not? 
                         #   But see below!
@@ -252,6 +274,7 @@ class x0_dot_x1(Problem):  # moved to n_double_one
         xdotx = np.sum(x[:,0:half] * x[:,half:], axis=1)
         x = torch.from_numpy(x).to(torch.float)
         xdotx = torch.from_numpy(xdotx).to(torch.float)
+        xdotx = torch.reshape(xdotx,(nbatch,1))
         return x,xdotx
  
 class y_linear_with_x(Problem):
@@ -311,4 +334,25 @@ class y_equals_x(Problem):
         x = torch.from_numpy(x).to(torch.float)
         y = torch.from_numpy(y).to(torch.float)
         return x, y
+    
+class cos_of_x(Problem):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+    
+    def get_input_and_target(self):
+        nbatch = self.nbatch
+        npts = self.npts
+        
+        xrange = 1
+        
+        x = np.random.uniform(-xrange,xrange,size=(nbatch,npts))
+        x = torch.from_numpy(x)
+        x = x.to(torch.float32)
+
+        y = x.detach().numpy()
+        y = np.cos(y)
+        y = torch.from_numpy(y)
+        y = y.to(torch.float32)
+        return x,y
+    
         
