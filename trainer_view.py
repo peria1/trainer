@@ -9,10 +9,12 @@ import matplotlib.pyplot as plt
 import trainer as tr
 from models import *
 from problems import *
-from trainer_utils import best_square
+from trainer_utils import best_square, date_for_filename
 from matplotlib.widgets import TextBox, Button
 import trainer_plots as tp
 import asyncio
+from matplotlib.backends.backend_pdf import PdfPages
+
 #
 # The following code can be used to decorate a function; such a decorated function 
 #   will then run in the background until stopped. I use it to start the training
@@ -47,24 +49,32 @@ class trainer_view():
                          self.Training_Display(name='residuals',\
                                                update=tp.residual_plot) ,\
                          self.Training_Display(name='weights',\
-                                               update=tp.weight_plot)]
+                                               update=tp.weight_plot),\
+                         self.Training_Display(name='dataflow',update=tp.dataflow_plot)]
+                         
+        if self.trainer.ytest.size() == self.trainer.xtest.size():
+            print('adding examples...')
+            self.displays.append(self.Training_Display(name='examples',\
+                                               update=tp.example_plot))
 
-        # Button layout, for a column at the right-hand side of window. 
+#        # Button layout, for a column at the right-hand side of window. 
+        text_box_left_edge = 0.75
+        text_box_width = 0.15
         left_edge = 0.6
         width = 0.3
         height = 0.075
         text_color = 'white'
         
         plt.figure(self.fig.number)
-        
-        axloss = plt.axes([left_edge, 0.8, width, height]) # left, bottom, width, height
-        self.loss_box = TextBox(axloss, 'Max Loss', \
+    
+        axloss = plt.axes([text_box_left_edge, 0.8, text_box_width, height]) # left, bottom, width, height
+        self.loss_box = TextBox(axloss, 'Max Loss: ', \
                               initial=str(1e30))
         self.loss_box.on_submit(self.set_max_loss)
         
         
-        axbox = plt.axes([left_edge, 0.7, width, height]) 
-        self.lr_box = TextBox(axbox, 'learning rate', \
+        axbox = plt.axes([text_box_left_edge, 0.7, text_box_width, height]) 
+        self.lr_box = TextBox(axbox, 'learning rate: ', \
                               initial=str(self.get_learning_rate()))
         self.lr_box.on_submit(self.set_learning_rate)
         
@@ -83,12 +93,18 @@ class trainer_view():
 #        self.disp_button.on_clicked(self.handle_update_button)
         self.disp_button.on_clicked(self.deal_with_update_button)
 
-        newbutton = plt.axes([left_edge, 0.4, width, height])
-        self.new_button = Button(newbutton, 'New Display')
-        self.new_button.label.set_color(text_color)
-        self.new_button.label.set_fontweight('bold')
-        self.new_button.color = 'black'
-        self.new_button.on_clicked(self.add_display)
+#        newbutton = plt.axes([left_edge, 0.4, width, height])
+#        self.new_button = Button(newbutton, 'New Display')
+#        self.new_button.label.set_color(text_color)
+#        self.new_button.label.set_fontweight('bold')
+#        self.new_button.color = 'black'
+#        self.new_button.on_clicked(self.add_display)
+        reportbutton = plt.axes([left_edge, 0.4, width, height])
+        self.report_button = Button(reportbutton, 'Make Report')
+        self.report_button.label.set_color(text_color)
+        self.report_button.label.set_fontweight('bold')
+        self.report_button.color = 'black'
+        self.report_button.on_clicked(self.generate_report)
 
         clearbutton = plt.axes([left_edge, 0.3, width, height])
         self.clear_button = Button(clearbutton, 'Clear History')
@@ -106,7 +122,6 @@ class trainer_view():
 
     def set_update_flag(self, flag=True):
         if flag is True:
-            print('setting update flag to True...')
             self.update_plots = True
         else:
             self.update_plots = False
@@ -144,7 +159,7 @@ class trainer_view():
     def deal_with_start_button(self, other_arg):  
         # Start or pause training, and toggle the button to the other state. 
         label = self.start_button.label.get_text()
-        if label == 'Start':
+        if label in ['Start','Resume']:
             self.call_trainer()
             # Grt ready to Pause next time button is pushed. 
             self.start_button.label.set_text('Pause')
@@ -152,7 +167,7 @@ class trainer_view():
         elif label == 'Pause':
             self.pause_training()
             # Get ready to Start next time button is pushed. 
-            self.start_button.label.set_text('Start')
+            self.start_button.label.set_text('Resume')
             self.start_button.color = 'green'
         else:
             print('How did this happen? Start button label is', label)
@@ -173,7 +188,7 @@ class trainer_view():
             print('How did this happen? Update button label is', label)
 
     def arm_start_button(self):
-            self.start_button.label.set_text('Start')
+            self.start_button.label.set_text('Resume')
             self.start_button.color = 'green'
         
 
@@ -205,10 +220,31 @@ class trainer_view():
         lrlist = []
         [lrlist.append(p['lr']) for p in self.trainer.optimizer.param_groups]
         return lrlist[0]
-        
+    
+    def generate_report(self, event):
+        model_name = self.trainer.get_model_name()
+        problem_name = self.trainer.get_problem_name()
+        date = date_for_filename()
+        report_file = model_name + '_' +  problem_name + '_' + date + '.pdf'
+        print('Generating report:',report_file)
+        with PdfPages(report_file) as pdf:
+            pdf.savefig(self.fig)   # First page is the controller window,
+            for d in self.displays:  #  then all the displays in order. 
+                if 'layer_names' in dir(d):
+                    curr_layer = d.layer_to_show
+                    for i,ln in enumerate(d.layer_names):
+                        d.layer_to_show = i
+                        d.update(self, d)
+                        pdf.savefig(d.fig)
+                    d.layer_to_show = curr_layer
+                    d.update(self, d)
+                else:
+                    pdf.savefig(d.fig)
+    
     class Training_Display():
         def __init__(self, name='no name', nrows=1, ncols=1, nplots=None, update=None):
             self.first = True
+            self.name = name
             self.nrows = nrows
             self.ncols = ncols
             if nplots and (nplots != (nrows*ncols)):

@@ -7,7 +7,6 @@ Created on Sat Nov  9 07:31:52 2019
 import torch
 import numpy as np
 import torch.utils.data
-from torch import nn
 """
 The superclass Problem takes care of things common to all of our "math 
     problem" data sets, like default dimensions and the requirement to 
@@ -205,7 +204,8 @@ class cumulative_sum_of_x(Problem): # moved to n_double_n
 
         xrange = 20.0
         x = np.random.uniform(low=-xrange, high=xrange, size=xsize)
-        y = np.cumsum(x,axis=1)
+        bias = np.random.uniform(low=-xrange/10, high=xrange/10,size=(nbatch,1))
+        y = np.cumsum(x+bias,axis=1)
         x = torch.from_numpy(x).to(torch.float)
         y = torch.from_numpy(y).to(torch.float)
         
@@ -242,7 +242,7 @@ class x0_corr_x1(Problem):    # moved to n_double_one_tanh
             r[i] = np.corrcoef(x[i,0:half], y=x[i,half:])[0,1]
 
         x = torch.from_numpy(x).to(torch.float)
-        r = torch.from_numpy(r).to(torch.float)
+        r = torch.from_numpy(r).to(torch.float).reshape((nbatch,1))
         return x,r
 
  
@@ -317,16 +317,10 @@ class y_equals_x(Problem):
         xsize = (nbatch,npts)
 #        half = int(npts/2)
         
-        xrange = 20.0
-        sloperange = 10.0
-        offsetrange = 10.0
-        
+        xrange = 20.0        
         noiseamp = np.random.uniform(low=1.0, high = 10*xrange, size=(nbatch,1))
         noise = np.random.normal(scale=noiseamp,size=xsize)
-       
-        slope = np.random.uniform(-sloperange,sloperange,size=(nbatch,1))
-        offset = np.random.uniform(-offsetrange,offsetrange,size=(nbatch,1))
-        
+               
         x = np.random.uniform(low=-xrange, high=xrange, size=xsize)
         y = x
         x = x + noise

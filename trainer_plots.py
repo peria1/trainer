@@ -23,7 +23,7 @@ def residual_plot(viewer,d):
         viewer.trainer.model(viewer.trainer.xtest).cpu().detach().numpy()
     d.ax.plot(viewer.trainer.yp, residuals,'o')
     title_str = viewer.trainer.get_problem_name() + \
-        ': target minus prediction versus target'
+        ': target minus prediction vs. target'
     d.ax.set_title(title_str)
     xlim = d.ax.get_xlim()
     d.ax.hlines(0, xlim[0], xlim[1])
@@ -32,39 +32,87 @@ def weight_plot(viewer, d):
     if d.first:
         import matplotlib.pyplot as plt
         from matplotlib.widgets import RadioButtons
-        
-        d.first = False
-        
+                
         d.plist = viewer.trainer.get_named_weight_list()
-        d.names = [n for n,p in d.plist]
+        d.layer_names = [n for n,p in d.plist]
         axcolor = 'lightgoldenrodyellow'
         plt.figure(d.fig.number);
-        plt.subplots_adjust(left=0.4)        
+        plt.subplots_adjust(left=0.4)
+        d.ax.set_axis_off()
         rax = plt.axes([0.05, 0.05, 0.15, 0.9], facecolor=axcolor)
-        d.radio = RadioButtons(rax, d.names)
+        d.radio = RadioButtons(rax, d.layer_names)
+
         d.layer_to_show = 0
-        def set_layer(event):
+        def set_layer_and_update(event):
             d.layer_to_show =\
-            [i for i,n in enumerate(d.names) if event in n]
+            [i for i,n in enumerate(d.layer_names) if event in n]
             try:
                 assert len(d.layer_to_show)==1
             except AssertionError:
                 print('More than one layer matches',event,'. Figure this out!')
             d.layer_to_show = d.layer_to_show[0]
-            
-        d.radio.on_clicked(set_layer)
+            if not d.first:
+                d.update(viewer,d)
+                
+        d.radio.on_clicked(set_layer_and_update)
+        d.plt = plt
+        d.cbar_axis = d.plt.axes([0.25, 0.05, 0.05, 0.9])
+        d.first = False
 
-    if len(d.plist) == 1:
-        im = d.plist[0][1].cpu().detach().numpy()
-        d.ax.imshow(im)
-    else:
-        im = d.plist[d.layer_to_show][1].cpu().detach().numpy()
-        d.ax.imshow(im)
-        d.ax.set_title(d.names[d.layer_to_show])
-#        for i,a in enumerate(d.ax.flatten()):
-#            im = d.plist[i][1].cpu().detach().numpy()
-#            a.imshow(im)
-#            
+    im = d.plist[d.layer_to_show][1].cpu().detach().numpy()
+    d.ax.set_axis_off()
+    d.mappable = d.ax.imshow(im)
+    d.ax.set_title(d.layer_names[d.layer_to_show])
+    d.cbar_axis.clear()
+    d.plt.colorbar(mappable=d.mappable, cax=d.cbar_axis)
+    d.fig.canvas.draw()
+    d.fig.canvas.flush_events()
     
+def dataflow_plot(viewer, d):
+    global FEATURE_MAPS
+    if d.first:
+        import torch
+        d.torch = torch
+        FEATURE_MAPS = None
+        net = viewer.trainer.model
+        d.layer_names =  [name for name, module in net.named_modules()\
+                         if len(module._modules) == 0]
+        d.modules = [module for name, module in net.named_modules()\
+                         if len(module._modules) == 0]
+        d.layer_to_show = 0
+        d.x = viewer.trainer.xtest
 
+        def capture_data_hook(self, input, output):
+            global FEATURE_MAPS
+            FEATURE_MAPS = output.cpu().detach().numpy()
+
+        d.hook = capture_data_hook
+    
+    mp = d.modules[d.layer_to_show]
+    chandle = mp.register_forward_hook(d.hook)
+
+    viewer.trainer.model(d.x)
+    chandle.remove()
+    d.ax.imshow(FEATURE_MAPS)
+    d.ax.set_title(d.layer_names[d.layer_to_show])
+   
+def example_plot(viewer, d):
+    if d.first:
+        import numpy as np
+        d.np = np
+        predsize = viewer.trainer.yp.shape
+        d.n_examples = predsize[0]
+        
+    pick = int(d.np.random.uniform(0,d.n_examples,size=(1)))
+    pred = viewer.trainer.model(viewer.trainer.xtest[pick,:]).cpu().detach().numpy()
+#    inp = viewer.trainer.xp[pick,:]
+#    ord = d.np.argsort(inp)
+    target = viewer.trainer.yp[pick,:]
+    pline, = d.ax.plot(pred)
+    tline, = d.ax.plot(target)
+    d.ax.set_title('Test Data Example '+str(pick))
+    d.ax.set_xlabel('input')
+    d.ax.legend((pline,tline),('prediction','target'))
+   
+    
     

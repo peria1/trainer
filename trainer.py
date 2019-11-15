@@ -4,9 +4,6 @@ Created on Mon Oct 14 14:28:42 2019
 
 @author: Bill
 """
-
-
-
 #import matplotlib.pyplot as plt
 #import argparse
 #import itertools
