@@ -68,16 +68,51 @@ def weight_plot(viewer, d):
     d.fig.canvas.draw()
     d.fig.canvas.flush_events()
     
-#def example_plot(viewer, d):
-#    if d.first:
-#        import numpy as np
-#        d.np = np
-#        predsize = viewer.trainer.yp.shape
-#        d.n_examples = predsize[0]
-#        
-##    pick = int(d.np.random.uniform(0,d.n_examples,size=(1)))
-#    pred = 
-#    d.ax.plot()
-#    
+def dataflow_plot(viewer, d):
+    global FEATURE_MAPS
+    if d.first:
+        import torch
+        d.torch = torch
+        FEATURE_MAPS = None
+        net = viewer.trainer.model
+        d.layer_names =  [name for name, module in net.named_modules()\
+                         if len(module._modules) == 0]
+        d.modules = [module for name, module in net.named_modules()\
+                         if len(module._modules) == 0]
+        d.layer_to_show = 0
+        d.x = viewer.trainer.xtest
 
+        def capture_data_hook(self, input, output):
+            global FEATURE_MAPS
+            FEATURE_MAPS = output.cpu().detach().numpy()
+
+        d.hook = capture_data_hook
+    
+    mp = d.modules[d.layer_to_show]
+    chandle = mp.register_forward_hook(d.hook)
+
+    viewer.trainer.model(d.x)
+    chandle.remove()
+    d.ax.imshow(FEATURE_MAPS)
+    d.ax.set_title(d.layer_names[d.layer_to_show])
+   
+def example_plot(viewer, d):
+    if d.first:
+        import numpy as np
+        d.np = np
+        predsize = viewer.trainer.yp.shape
+        d.n_examples = predsize[0]
+        
+    pick = int(d.np.random.uniform(0,d.n_examples,size=(1)))
+    pred = viewer.trainer.model(viewer.trainer.xtest[pick,:]).cpu().detach().numpy()
+#    inp = viewer.trainer.xp[pick,:]
+#    ord = d.np.argsort(inp)
+    target = viewer.trainer.yp[pick,:]
+    pline, = d.ax.plot(pred)
+    tline, = d.ax.plot(target)
+    d.ax.set_title('Test Data Example '+str(pick))
+    d.ax.set_xlabel('input')
+    d.ax.legend((pline,tline),('prediction','target'))
+   
+    
     

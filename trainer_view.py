@@ -49,11 +49,15 @@ class trainer_view():
                          self.Training_Display(name='residuals',\
                                                update=tp.residual_plot) ,\
                          self.Training_Display(name='weights',\
-                                               update=tp.weight_plot)] #,\
-#                         self.Training_Display(name='examples',\
-#                                               update=tp.)]
+                                               update=tp.weight_plot),\
+                         self.Training_Display(name='dataflow',update=tp.dataflow_plot)]
+                         
+        if self.trainer.ytest.size() == self.trainer.xtest.size():
+            print('adding examples...')
+            self.displays.append(self.Training_Display(name='examples',\
+                                               update=tp.example_plot))
 
-        # Button layout, for a column at the right-hand side of window. 
+#        # Button layout, for a column at the right-hand side of window. 
         text_box_left_edge = 0.75
         text_box_width = 0.15
         left_edge = 0.6
