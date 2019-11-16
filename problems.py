@@ -48,14 +48,15 @@ class x_double_x(Problem): # target the input squared
         # The following really just limits the range of x, and then flips the 
         #    sign, to generate y. 
         #
-        x = np.random.normal(size=(nbatch,npts))
-        x = np.cos(x)
+        x = np.random.normal(size=(nbatch,npts))    
+        alpha = np.random.uniform(size=(nbatch,1))
+        y = alpha*x*x
+        
+        y = torch.from_numpy(y)
+        y = y.to(torch.float32)
         x = torch.from_numpy(x)
         x = x.to(torch.float32)
-    
-        y = x*x
-        y = y.to(torch.float32)
-        
+       
         return x,y
    
 
@@ -337,16 +338,31 @@ class cos_of_x(Problem):
         nbatch = self.nbatch
         npts = self.npts
         
-        xrange = 1
+        xrange = np.pi
         
+        x = np.random.uniform(-xrange,xrange,size=(nbatch,npts))
+        y = np.cos(x)
+        
+        x = torch.from_numpy(x).to(torch.float32)
+        y = torch.from_numpy(y).to(torch.float32)
+        return x,y
+    
+class abs_fft(Problem):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+    
+    def get_input_and_target(self):
+        nbatch = self.nbatch
+        npts = self.npts
+
+        xrange = 100
         x = np.random.uniform(-xrange,xrange,size=(nbatch,npts))
         x = torch.from_numpy(x)
         x = x.to(torch.float32)
 
-        y = x.detach().numpy()
-        y = np.cos(y)
+        y = np.abs(np.fft.fft(x))
         y = torch.from_numpy(y)
         y = y.to(torch.float32)
+        
         return x,y
-    
         
