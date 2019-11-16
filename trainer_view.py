@@ -10,7 +10,7 @@ import trainer as tr
 from models import *
 from problems import *
 from trainer_utils import best_square, date_for_filename
-from matplotlib.widgets import TextBox, Button
+from matplotlib.widgets import TextBox, Button, CheckButtons
 import trainer_plots as tp
 import asyncio
 from matplotlib.backends.backend_pdf import PdfPages
@@ -37,7 +37,7 @@ class trainer_view():
         self.fig.canvas.mpl_connect('key_press_event', self.process_key) 
         self.fig.canvas.mpl_connect('button_press_event', self.process_button) 
         self.fig.canvas.mpl_connect('close_event', self.close_it_down)
-
+        self.ax.set_axis_off()
 #        self.fig.canvas.manager.window.raise_() # Trying to make windows visible right away
 #        self.displays = [loss_graph]
         
@@ -48,19 +48,19 @@ class trainer_view():
         #
         #  Available displays...feel free to add more!
         #
-        self.displays = [self.Training_Display(name='loss history', active = True, \
+        self.displays = [self.Training_Display(name='loss history',  \
                                                nrows=2,ncols=1,\
                                                update=tp.basic_loss_plot), \
-                         self.Training_Display(name='residuals',  active = True, \
+                         self.Training_Display(name='residuals',  \
                                                update=tp.residual_plot) ,\
-                         self.Training_Display(name='weights',  active = True, \
+                         self.Training_Display(name='weights',  \
                                                update=tp.weight_plot),\
-                         self.Training_Display(name='dataflow',  active = True, \
+                         self.Training_Display(name='dataflow',  \
                                                update=tp.dataflow_plot)]
                          
         if self.trainer.ytest.size() == self.trainer.xtest.size():
             print('adding examples...')
-            self.displays.append(self.Training_Display(name='examples', active = True,\
+            self.displays.append(self.Training_Display(name='examples', active = False,\
                                                update=tp.example_plot))
 
 #        # Button layout, for a column at the right-hand side of window. 
@@ -79,7 +79,19 @@ class trainer_view():
                               initial=str(1e30))
         self.loss_box.on_submit(self.set_max_loss)
         
+        display_pick_ax = plt.axes([0.15, 0.125, width, 0.75])
+        disp_names = [d.name for d in self.displays]
+        actives = [d.active for d in self.displays]
         
+        self.dispradio = CheckButtons(display_pick_ax,  disp_names, actives)
+        def toggle_active_display(event):
+            for i,n in enumerate(disp_names):
+                if n == event:
+                    self.displays[i].active = not self.displays[i].active
+            
+            
+        self.dispradio.on_clicked(toggle_active_display)
+
         axbox = plt.axes([text_box_left_edge, 0.7, text_box_width, height]) 
         self.lr_box = TextBox(axbox, 'learning rate: ', \
                               initial=str(self.get_learning_rate()))
@@ -135,7 +147,7 @@ class trainer_view():
 
     def update_displays(self):
         if self.update_plots:
-            for d in self.displays:
+            for d in [d for d in self.displays if d.active]:
                 try:
                     for a in d.ax.flatten():
                         a.clear()
@@ -236,7 +248,7 @@ class trainer_view():
         print('Generating report:',report_file)
         with PdfPages(report_file) as pdf:
             pdf.savefig(self.fig)   # First page is the controller window,
-            for d in self.displays:  #  then all the displays in order. 
+            for d in [d for d in self.displays if d.active]:  #  then all the displays in order. 
                 if 'layer_names' in dir(d):
                     curr_layer = d.layer_to_show
                     for i,ln in enumerate(d.layer_names):
@@ -265,6 +277,8 @@ class trainer_view():
             
             if active:
                 self.active = True
+            else:
+                self.active = False
                 
         def update(self):
             print('You need to define an update function in Training_Display objects.')
