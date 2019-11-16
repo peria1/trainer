@@ -15,8 +15,6 @@ from models import *
 from problems import *
 from trainer_utils import kscirc, uichoosefile, date_for_filename, get_slash
 
-
-
 class trainer():
     def __init__(self, trainee_class, problem_class, \
                  max_loss=None, reload=False, \
@@ -162,7 +160,6 @@ class trainer():
                 print(loss_str)
                            
         if done:
-            print('should update!')
             self.viewer.set_update_flag(flag=True)
             self.viewer.update_displays()
             self.viewer.arm_start_button()
@@ -194,3 +191,5 @@ class trainer():
      
     def get_named_weight_list(self):
         return [(n,p) for (n,p) in self.model.named_parameters() if '.weight' in n]
+
+

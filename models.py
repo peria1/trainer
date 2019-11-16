@@ -79,9 +79,47 @@ class bisect_to_one(nn.Module):
 
 
 
+class n_double_n_act(nn.Module): # moved to n_double_n
+    def __init__(self, npts=None, nbatch=None): 
+        super().__init__()
+
+        if npts is None:
+            npts = 50
+        if nbatch is None:
+            nbatch = 128
+        
+        self.npts = npts
+        self.nbatch = nbatch
+        
+        self.L1 = nn.Linear(npts, 2*npts)
+        self.L2 = nn.Linear(2*npts, 2*npts)
+        self.L3 = nn.Linear(2*npts, 2*npts)
+        self.L4 = nn.Linear(2*npts, 2*npts)
+        self.L5 = nn.Linear(2*npts, 2*npts)
+        self.L6 = nn.Linear(2*npts, 2*npts)
+        self.L7 = nn.Linear(2*npts, 2*npts)
+        self.Llast = nn.Linear(2*npts, npts)
+        self.activation1 = nn.LeakyReLU()
+        self.activation2 = nn.Tanh()
+
+
+    def forward(self, x):
+        dataflow = self.activation1(self.L1(x))
+        dataflow = self.activation1(self.L2(dataflow))
+        dataflow = self.activation1(self.L3(dataflow))
+        dataflow = self.activation1(self.L4(dataflow))
+        dataflow = self.activation2(self.L5(dataflow))
+        dataflow = self.activation2(self.L6(dataflow))
+        dataflow = self.activation2(self.L7(dataflow))
+        dataflow = self.Llast(dataflow)
+        
+        return dataflow
+
+
+
 class n_double_n(nn.Module): # moved to n_double_n
     def __init__(self, npts=None, nbatch=None): 
-        super(n_double_n, self).__init__()
+        super().__init__()
 
         if npts is None:
             npts = 50
