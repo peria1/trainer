@@ -29,32 +29,38 @@ def fire_and_forget(f):
 
 class trainer_view():
     def __init__(self, *args, **kwargs):
+        #
+        # Controller window
+        #
         self.fig, self.ax = plt.subplots(1,1)       
         self.fig.canvas.mpl_disconnect(self.fig.canvas.manager.key_press_handler_id)       
         self.fig.canvas.mpl_connect('key_press_event', self.process_key) 
         self.fig.canvas.mpl_connect('button_press_event', self.process_button) 
         self.fig.canvas.mpl_connect('close_event', self.close_it_down)
 
-#        self.fig.canvas.manager.window.raise_()
+#        self.fig.canvas.manager.window.raise_() # Trying to make windows visible right away
 #        self.displays = [loss_graph]
         
         self.trainer = tr.trainer(*args, **kwargs, viewer=self)
         self.trainer.pause = False
         self.update_plots = False
 
-    
-        self.displays = [self.Training_Display(name='loss history',\
+        #
+        #  Available displays...feel free to add more!
+        #
+        self.displays = [self.Training_Display(name='loss history', active = True, \
                                                nrows=2,ncols=1,\
-                                               update=tp.basic_loss_plot),\
-                         self.Training_Display(name='residuals',\
+                                               update=tp.basic_loss_plot), \
+                         self.Training_Display(name='residuals',  active = True, \
                                                update=tp.residual_plot) ,\
-                         self.Training_Display(name='weights',\
+                         self.Training_Display(name='weights',  active = True, \
                                                update=tp.weight_plot),\
-                         self.Training_Display(name='dataflow',update=tp.dataflow_plot)]
+                         self.Training_Display(name='dataflow',  active = True, \
+                                               update=tp.dataflow_plot)]
                          
         if self.trainer.ytest.size() == self.trainer.xtest.size():
             print('adding examples...')
-            self.displays.append(self.Training_Display(name='examples',\
+            self.displays.append(self.Training_Display(name='examples', active = True,\
                                                update=tp.example_plot))
 
 #        # Button layout, for a column at the right-hand side of window. 
@@ -64,6 +70,7 @@ class trainer_view():
         width = 0.3
         height = 0.075
         text_color = 'white'
+        
         
         plt.figure(self.fig.number)
     
@@ -242,7 +249,8 @@ class trainer_view():
                     pdf.savefig(d.fig)
     
     class Training_Display():
-        def __init__(self, name='no name', nrows=1, ncols=1, nplots=None, update=None):
+        def __init__(self, name='no name', nrows=1, ncols=1, nplots=None, \
+                     update=None, active = None):
             self.first = True
             self.name = name
             self.nrows = nrows
@@ -252,9 +260,11 @@ class trainer_view():
             
             self.fig, self.ax = plt.subplots(nrows, ncols)
             
-            if update:
+            if update: 
                 self.update = update
             
+            if active:
+                self.active = True
                 
         def update(self):
             print('You need to define an update function in Training_Display objects.')
