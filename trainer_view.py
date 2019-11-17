@@ -38,8 +38,7 @@ class trainer_view():
         self.fig.canvas.mpl_connect('button_press_event', self.process_button) 
         self.fig.canvas.mpl_connect('close_event', self.close_it_down)
         self.ax.set_axis_off()
-#        self.fig.canvas.manager.window.raise_() # Trying to make windows visible right away
-#        self.displays = [loss_graph]
+        self.fig.canvas.manager.window.raise_() # Trying to make windows visible right away
         
         self.trainer = tr.trainer(*args, **kwargs, viewer=self)
         self.trainer.pause = False
@@ -87,9 +86,11 @@ class trainer_view():
         def toggle_active_display(event):
             for i,n in enumerate(disp_names):
                 if n == event:
-                    self.displays[i].active = not self.displays[i].active
-            
-            
+                    if self.displays[i].active == True:
+                        self.displays[i].deactivate()
+                    else:
+                        self.displays[i].activate()
+#                    self.displays[i].active = not self.displays[i].active
         self.dispradio.on_clicked(toggle_active_display)
 
         axbox = plt.axes([text_box_left_edge, 0.7, text_box_width, height]) 
@@ -137,7 +138,8 @@ class trainer_view():
     
     def close_it_down(self,event):
         for d in self.displays:
-            plt.close(d.fig)
+            if d.active:
+                plt.close(d.fig)
 
     def set_update_flag(self, flag=True):
         if flag is True:
@@ -147,7 +149,8 @@ class trainer_view():
 
     def update_displays(self):
         if self.update_plots:
-            for d in [d for d in self.displays if d.active]:
+            active_displays = (d for d in self.displays if d.active)
+            for d in active_displays:
                 try:
                     for a in d.ax.flatten():
                         a.clear()
@@ -248,7 +251,7 @@ class trainer_view():
         print('Generating report:',report_file)
         with PdfPages(report_file) as pdf:
             pdf.savefig(self.fig)   # First page is the controller window,
-            for d in [d for d in self.displays if d.active]:  #  then all the displays in order. 
+            for d in (d for d in self.displays if d.active):  #  then all the displays in order. 
                 if 'layer_names' in dir(d):
                     curr_layer = d.layer_to_show
                     for i,ln in enumerate(d.layer_names):
@@ -264,22 +267,34 @@ class trainer_view():
         def __init__(self, name='no name', nrows=1, ncols=1, nplots=None, \
                      update=None, active = None):
             self.first = True
+
+            if update: 
+                self.update = update
+            
+            if active:
+                self.activate()
+            else:
+                self.active = False
+
             self.name = name
             self.nrows = nrows
             self.ncols = ncols
             if nplots and (nplots != (nrows*ncols)):
                 nrows,ncols = best_square(nplots)
-            
-            self.fig, self.ax = plt.subplots(nrows, ncols)
-            
-            if update: 
-                self.update = update
-            
-            if active:
-                self.active = True
-            else:
-                self.active = False
                 
+            if not update:
+                print('You need to define an update function in Training_Display objects.')
+                print('Look in trainer_plots.py to see examples of update functions.')
+
         def update(self):
-            print('You need to define an update function in Training_Display objects.')
-            print('Look in trainer_plots.py to see examples of update functions.')
+            pass
+
+        def activate(self):
+            self.active = True
+            self.fig, self.ax = plt.subplots(self.nrows, self.ncols)
+            self.first = True
+        
+        def deactivate(self):
+            self.active = False
+            plt.close(self.fig)
+        
