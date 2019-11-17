@@ -69,14 +69,9 @@ class trainer_view():
         width = 0.3
         height = 0.075
         text_color = 'white'
-        
+        down_from_top = [0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2]
         
         plt.figure(self.fig.number)
-    
-        axloss = plt.axes([text_box_left_edge, 0.8, text_box_width, height]) # left, bottom, width, height
-        self.loss_box = TextBox(axloss, 'Max Loss: ', \
-                              initial=str(1e30))
-        self.loss_box.on_submit(self.set_max_loss)
         
         display_pick_ax = plt.axes([0.15, 0.125, width, 0.75])
         disp_names = [d.name for d in self.displays]
@@ -93,40 +88,44 @@ class trainer_view():
 #                    self.displays[i].active = not self.displays[i].active
         self.dispradio.on_clicked(toggle_active_display)
 
-        axbox = plt.axes([text_box_left_edge, 0.7, text_box_width, height]) 
+    
+        ax_loss_box = plt.axes([text_box_left_edge, down_from_top[0], text_box_width, height]) # left, bottom, width, height
+        self.loss_box = TextBox(ax_loss_box, 'Max Loss: ', \
+                              initial=str(1e30))
+        self.loss_box.on_submit(self.set_max_loss)
+
+        ax_pval_box = plt.axes([text_box_left_edge, down_from_top[1], text_box_width, height]) # left, bottom, width, height
+        self.pval_box = TextBox(ax_pval_box, 'Min p-value: ', \
+                              initial=str(0.5))
+        self.pval_box.on_submit(self.set_min_pval)
+        
+        axbox = plt.axes([text_box_left_edge, down_from_top[2], text_box_width, height]) 
         self.lr_box = TextBox(axbox, 'learning rate: ', \
                               initial=str(self.get_learning_rate()))
         self.lr_box.on_submit(self.set_learning_rate)
         
-        axbutton = plt.axes([left_edge, 0.6, width, height])
+        axbutton = plt.axes([left_edge, down_from_top[3], width, height])
         self.start_button = Button(axbutton, 'Start')
         self.start_button.label.set_color(text_color)
         self.start_button.label.set_fontweight('bold')
         self.start_button.color = 'green'  # callback will toggle the color
         self.start_button.on_clicked(self.deal_with_start_button)
         
-        dispbutton = plt.axes([left_edge, 0.5, width, height])
+        dispbutton = plt.axes([left_edge, down_from_top[4], width, height])
         self.disp_button = Button(dispbutton, 'Update Displays')
         self.disp_button.label.set_color(text_color)
         self.disp_button.label.set_fontweight('bold')
         self.disp_button.color = 'black'
-#        self.disp_button.on_clicked(self.handle_update_button)
         self.disp_button.on_clicked(self.deal_with_update_button)
 
-#        newbutton = plt.axes([left_edge, 0.4, width, height])
-#        self.new_button = Button(newbutton, 'New Display')
-#        self.new_button.label.set_color(text_color)
-#        self.new_button.label.set_fontweight('bold')
-#        self.new_button.color = 'black'
-#        self.new_button.on_clicked(self.add_display)
-        reportbutton = plt.axes([left_edge, 0.4, width, height])
+        reportbutton = plt.axes([left_edge, down_from_top[5], width, height])
         self.report_button = Button(reportbutton, 'Make Report')
         self.report_button.label.set_color(text_color)
         self.report_button.label.set_fontweight('bold')
         self.report_button.color = 'black'
         self.report_button.on_clicked(self.generate_report)
 
-        clearbutton = plt.axes([left_edge, 0.3, width, height])
+        clearbutton = plt.axes([left_edge, down_from_top[6], width, height])
         self.clear_button = Button(clearbutton, 'Clear History')
         self.clear_button.label.set_color(text_color)
         self.clear_button.label.set_fontweight('bold')
@@ -169,6 +168,12 @@ class trainer_view():
             self.trainer.max_loss = float(text)
         except:
             print('Unable to set max loss to',text)
+
+    def set_min_pval(self, text):
+        try:
+            self.trainer.min_pval = float(text)
+        except:
+            print('Unable to set min p-value to',text)
                 
     def set_learning_rate(self,text):
         try:
