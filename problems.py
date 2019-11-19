@@ -36,6 +36,33 @@ class Problem():
         print('You must define your data generator.')
         return None
 
+class x_triple_x(Problem): # target the input squared
+                        #   But see below!
+    def __init__(self, npts=None, nbatch=None):
+        super().__init__()
+
+    def get_input_and_target(self):
+        nbatch = self.nbatch
+        npts = self.npts
+        #
+        # The following really just limits the range of x, and then flips the 
+        #    sign, to generate y. 
+        #
+        x = np.random.normal(size=(nbatch,npts))
+        
+    
+        y = np.power(x,3)
+#        alpha = np.random.normal(size=(nbatch,npts))
+#        y = #alpha * y
+        
+        x = torch.from_numpy(x)
+        x = x.to(torch.float32)
+        y = torch.from_numpy(y)
+        y = y.to(torch.float32)
+        
+        return x,y
+
+
 class x_double_x(Problem): # target the input squared
                         #   But see below!
     def __init__(self, npts=None, nbatch=None):
