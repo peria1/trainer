@@ -15,20 +15,22 @@ from models import *
 from problems import *
 from trainer_utils import kscirc, uichoosefile, date_for_filename, get_slash
 
-
-
 class trainer():
     def __init__(self, trainee_class, problem_class, \
-                 max_loss=None, reload=False, \
+                 max_loss=None, min_pval = None, reload=False, \
                  viewer=None, **kwargs):
         #
         # Given the name of a trainee class, trainer.__init__ will instantiate that 
         #  class and get set up to train that instance. 
         #
         
-        if max_loss is None:
+        if not max_loss:
             max_loss = 1e30 
         self.max_loss = max_loss
+
+        if not min_pval:
+            min_pval = 0.5 
+        self.min_pval = min_pval
         
         self.set_device()
 
@@ -55,7 +57,6 @@ class trainer():
         self.xtest, self.ytest = self.data_generator()
         self.xtest = self.xtest.to(self.device)
         self.ytest = self.ytest.to(self.device)
-
 
         try:
             assert(self.model(self.xtest).size()==self.ytest.size())
@@ -131,7 +132,7 @@ class trainer():
             up_since_last = self.test_loss_history[-1] > self.train_loss_history[-1]
             larger_than_recent_average = \
             self.test_loss_history[-1] > np.mean(self.test_loss_history[-ppb:-1])
-            kscirc_plausible = p > 0.5
+            kscirc_plausible = p > self.min_pval
             loss_small_enough = self.test_loss_history[-1] < self.max_loss 
 
             done =  up_since_last and \
@@ -162,7 +163,6 @@ class trainer():
                 print(loss_str)
                            
         if done:
-            print('should update!')
             self.viewer.set_update_flag(flag=True)
             self.viewer.update_displays()
             self.viewer.arm_start_button()
@@ -194,3 +194,5 @@ class trainer():
      
     def get_named_weight_list(self):
         return [(n,p) for (n,p) in self.model.named_parameters() if '.weight' in n]
+
+

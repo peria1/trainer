@@ -57,7 +57,6 @@ def weight_plot(viewer, d):
         d.radio.on_clicked(set_layer_and_update)
         d.plt = plt
         d.cbar_axis = d.plt.axes([0.25, 0.05, 0.05, 0.9])
-        d.first = False
 
     im = d.plist[d.layer_to_show][1].cpu().detach().numpy()
     d.ax.set_axis_off()
@@ -69,32 +68,66 @@ def weight_plot(viewer, d):
     d.fig.canvas.flush_events()
     
 def dataflow_plot(viewer, d):
-    global FEATURE_MAPS
     if d.first:
+        import matplotlib.pyplot as plt
+        from matplotlib.widgets import RadioButtons
         import torch
         d.torch = torch
-        FEATURE_MAPS = None
+
+        plt.figure(d.fig.number);
+        plt.subplots_adjust(left=0.4)
+
         net = viewer.trainer.model
         d.layer_names =  [name for name, module in net.named_modules()\
-                         if len(module._modules) == 0]
+                         if (len(module._modules) == 0) and (name != 'custom_loss')]
         d.modules = [module for name, module in net.named_modules()\
-                         if len(module._modules) == 0]
+                         if (len(module._modules) == 0) and (name != 'custom_loss')]
         d.layer_to_show = 0
         d.x = viewer.trainer.xtest
+        d.plt = plt
+        d.cbar_axis = d.plt.axes([0.25, 0.05, 0.05, 0.9])
+
+
+        axcolor = 'lightgoldenrodyellow'
+        rax = plt.axes([0.05, 0.05, 0.15, 0.9], facecolor=axcolor)
+        d.radio = RadioButtons(rax, d.layer_names)
+        d.layer_to_show = 0
+        
+        def set_layer_and_update(event):
+            d.layer_to_show =\
+            [i for i,n in enumerate(d.layer_names) if event in n]
+            try:
+                assert len(d.layer_to_show)==1
+            except AssertionError:
+                print('More than one layer matches',event,'. Figure this out!')
+            d.layer_to_show = d.layer_to_show[0]
+            if not d.first:
+                d.update(viewer,d)
+
+        d.radio.on_clicked(set_layer_and_update)
+
 
         def capture_data_hook(self, input, output):
-            global FEATURE_MAPS
-            FEATURE_MAPS = output.cpu().detach().numpy()
-
+            d.current_data = output.cpu().detach().numpy()
         d.hook = capture_data_hook
-    
+            
     mp = d.modules[d.layer_to_show]
     chandle = mp.register_forward_hook(d.hook)
-
     viewer.trainer.model(d.x)
     chandle.remove()
-    d.ax.imshow(FEATURE_MAPS)
+    
+#    if not FEATURE_MAPS:
+#        print('FEATURE_MAPS not set in capture_data_hook.')
+        
+    d.ax.imshow(d.current_data)
     d.ax.set_title(d.layer_names[d.layer_to_show])
+    d.ax.set_axis_off()
+    d.mappable = d.ax.imshow(d.current_data)
+    d.ax.set_title(d.layer_names[d.layer_to_show]+ ' output data')
+    d.cbar_axis.clear()
+    d.plt.colorbar(mappable=d.mappable, cax=d.cbar_axis)
+    d.fig.canvas.draw()
+    d.fig.canvas.flush_events()
    
 def example_plot(viewer, d):
     if d.first:

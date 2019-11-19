@@ -10,7 +10,7 @@ import trainer as tr
 from models import *
 from problems import *
 from trainer_utils import best_square, date_for_filename
-from matplotlib.widgets import TextBox, Button
+from matplotlib.widgets import TextBox, Button, CheckButtons
 import trainer_plots as tp
 import asyncio
 from matplotlib.backends.backend_pdf import PdfPages
@@ -29,32 +29,37 @@ def fire_and_forget(f):
 
 class trainer_view():
     def __init__(self, *args, **kwargs):
+        #
+        # Controller window
+        #
         self.fig, self.ax = plt.subplots(1,1)       
         self.fig.canvas.mpl_disconnect(self.fig.canvas.manager.key_press_handler_id)       
         self.fig.canvas.mpl_connect('key_press_event', self.process_key) 
         self.fig.canvas.mpl_connect('button_press_event', self.process_button) 
         self.fig.canvas.mpl_connect('close_event', self.close_it_down)
-
-#        self.fig.canvas.manager.window.raise_()
-#        self.displays = [loss_graph]
+        self.ax.set_axis_off()
+        self.fig.canvas.manager.window.raise_() # Trying to make windows visible right away
         
         self.trainer = tr.trainer(*args, **kwargs, viewer=self)
         self.trainer.pause = False
         self.update_plots = False
 
-    
-        self.displays = [self.Training_Display(name='loss history',\
+        #
+        #  Available displays...feel free to add more!
+        #
+        self.displays = [self.Training_Display(name='loss history',  \
                                                nrows=2,ncols=1,\
-                                               update=tp.basic_loss_plot),\
-                         self.Training_Display(name='residuals',\
+                                               update=tp.basic_loss_plot), \
+                         self.Training_Display(name='residuals',  \
                                                update=tp.residual_plot) ,\
-                         self.Training_Display(name='weights',\
+                         self.Training_Display(name='weights',  \
                                                update=tp.weight_plot),\
-                         self.Training_Display(name='dataflow',update=tp.dataflow_plot)]
+                         self.Training_Display(name='dataflow',  \
+                                               update=tp.dataflow_plot)]
                          
         if self.trainer.ytest.size() == self.trainer.xtest.size():
             print('adding examples...')
-            self.displays.append(self.Training_Display(name='examples',\
+            self.displays.append(self.Training_Display(name='examples', active = False,\
                                                update=tp.example_plot))
 
 #        # Button layout, for a column at the right-hand side of window. 
@@ -64,49 +69,63 @@ class trainer_view():
         width = 0.3
         height = 0.075
         text_color = 'white'
+        down_from_top = [0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2]
         
         plt.figure(self.fig.number)
+        
+        display_pick_ax = plt.axes([0.15, 0.125, width, 0.75])
+        disp_names = [d.name for d in self.displays]
+        actives = [d.active for d in self.displays]
+        
+        self.dispradio = CheckButtons(display_pick_ax,  disp_names, actives)
+        def toggle_active_display(event):
+            for i,n in enumerate(disp_names):
+                if n == event:
+                    if self.displays[i].active == True:
+                        self.displays[i].deactivate()
+                    else:
+                        self.displays[i].activate()
+#                    self.displays[i].active = not self.displays[i].active
+        self.dispradio.on_clicked(toggle_active_display)
+
     
-        axloss = plt.axes([text_box_left_edge, 0.8, text_box_width, height]) # left, bottom, width, height
-        self.loss_box = TextBox(axloss, 'Max Loss: ', \
+        ax_loss_box = plt.axes([text_box_left_edge, down_from_top[0], text_box_width, height]) # left, bottom, width, height
+        self.loss_box = TextBox(ax_loss_box, 'Max Loss: ', \
                               initial=str(1e30))
         self.loss_box.on_submit(self.set_max_loss)
+
+        ax_pval_box = plt.axes([text_box_left_edge, down_from_top[1], text_box_width, height]) # left, bottom, width, height
+        self.pval_box = TextBox(ax_pval_box, 'Min p-value: ', \
+                              initial=str(0.5))
+        self.pval_box.on_submit(self.set_min_pval)
         
-        
-        axbox = plt.axes([text_box_left_edge, 0.7, text_box_width, height]) 
+        axbox = plt.axes([text_box_left_edge, down_from_top[2], text_box_width, height]) 
         self.lr_box = TextBox(axbox, 'learning rate: ', \
                               initial=str(self.get_learning_rate()))
         self.lr_box.on_submit(self.set_learning_rate)
         
-        axbutton = plt.axes([left_edge, 0.6, width, height])
+        axbutton = plt.axes([left_edge, down_from_top[3], width, height])
         self.start_button = Button(axbutton, 'Start')
         self.start_button.label.set_color(text_color)
         self.start_button.label.set_fontweight('bold')
         self.start_button.color = 'green'  # callback will toggle the color
         self.start_button.on_clicked(self.deal_with_start_button)
         
-        dispbutton = plt.axes([left_edge, 0.5, width, height])
+        dispbutton = plt.axes([left_edge, down_from_top[4], width, height])
         self.disp_button = Button(dispbutton, 'Update Displays')
         self.disp_button.label.set_color(text_color)
         self.disp_button.label.set_fontweight('bold')
         self.disp_button.color = 'black'
-#        self.disp_button.on_clicked(self.handle_update_button)
         self.disp_button.on_clicked(self.deal_with_update_button)
 
-#        newbutton = plt.axes([left_edge, 0.4, width, height])
-#        self.new_button = Button(newbutton, 'New Display')
-#        self.new_button.label.set_color(text_color)
-#        self.new_button.label.set_fontweight('bold')
-#        self.new_button.color = 'black'
-#        self.new_button.on_clicked(self.add_display)
-        reportbutton = plt.axes([left_edge, 0.4, width, height])
+        reportbutton = plt.axes([left_edge, down_from_top[5], width, height])
         self.report_button = Button(reportbutton, 'Make Report')
         self.report_button.label.set_color(text_color)
         self.report_button.label.set_fontweight('bold')
         self.report_button.color = 'black'
         self.report_button.on_clicked(self.generate_report)
 
-        clearbutton = plt.axes([left_edge, 0.3, width, height])
+        clearbutton = plt.axes([left_edge, down_from_top[6], width, height])
         self.clear_button = Button(clearbutton, 'Clear History')
         self.clear_button.label.set_color(text_color)
         self.clear_button.label.set_fontweight('bold')
@@ -118,7 +137,8 @@ class trainer_view():
     
     def close_it_down(self,event):
         for d in self.displays:
-            plt.close(d.fig)
+            if d.active:
+                plt.close(d.fig)
 
     def set_update_flag(self, flag=True):
         if flag is True:
@@ -128,7 +148,8 @@ class trainer_view():
 
     def update_displays(self):
         if self.update_plots:
-            for d in self.displays:
+            active_displays = (d for d in self.displays if d.active)
+            for d in active_displays:
                 try:
                     for a in d.ax.flatten():
                         a.clear()
@@ -147,6 +168,12 @@ class trainer_view():
             self.trainer.max_loss = float(text)
         except:
             print('Unable to set max loss to',text)
+
+    def set_min_pval(self, text):
+        try:
+            self.trainer.min_pval = float(text)
+        except:
+            print('Unable to set min p-value to',text)
                 
     def set_learning_rate(self,text):
         try:
@@ -229,7 +256,7 @@ class trainer_view():
         print('Generating report:',report_file)
         with PdfPages(report_file) as pdf:
             pdf.savefig(self.fig)   # First page is the controller window,
-            for d in self.displays:  #  then all the displays in order. 
+            for d in (d for d in self.displays if d.active):  #  then all the displays in order. 
                 if 'layer_names' in dir(d):
                     curr_layer = d.layer_to_show
                     for i,ln in enumerate(d.layer_names):
@@ -242,20 +269,37 @@ class trainer_view():
                     pdf.savefig(d.fig)
     
     class Training_Display():
-        def __init__(self, name='no name', nrows=1, ncols=1, nplots=None, update=None):
+        def __init__(self, name='no name', nrows=1, ncols=1, nplots=None, \
+                     update=None, active = None):
             self.first = True
+
+            if update: 
+                self.update = update
+            
+            if active:
+                self.activate()
+            else:
+                self.active = False
+
             self.name = name
             self.nrows = nrows
             self.ncols = ncols
             if nplots and (nplots != (nrows*ncols)):
                 nrows,ncols = best_square(nplots)
-            
-            self.fig, self.ax = plt.subplots(nrows, ncols)
-            
-            if update:
-                self.update = update
-            
                 
+            if not update:
+                print('You need to define an update function in Training_Display objects.')
+                print('Look in trainer_plots.py to see examples of update functions.')
+
         def update(self):
-            print('You need to define an update function in Training_Display objects.')
-            print('Look in trainer_plots.py to see examples of update functions.')
+            pass
+
+        def activate(self):
+            self.active = True
+            self.fig, self.ax = plt.subplots(self.nrows, self.ncols)
+            self.first = True
+        
+        def deactivate(self):
+            self.active = False
+            plt.close(self.fig)
+        
