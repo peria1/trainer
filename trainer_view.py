@@ -62,7 +62,9 @@ class trainer_view():
                          self.Training_Display(name='weights',  \
                                                update=tp.weight_plot),\
                          self.Training_Display(name='dataflow',  \
-                                               update=tp.dataflow_plot)]
+                                               update=tp.dataflow_plot),\
+                         self.Training_Display(name='singular values', \
+                                               update=tp.svd_weight_plot)]
 #                         self.Training_Display(name='magnitudes',\
 #                                               update=tp.numbers_check)]
                          
