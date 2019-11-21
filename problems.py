@@ -22,7 +22,6 @@ The subclasses here, in their init methods, take care of things like special
 """
 class Problem():
     def __init__(self, npts=None, nbatch=None,**kwargs):
-        
         if npts:
             self.npts = npts
         else:
@@ -42,45 +41,7 @@ class Problem():
         print('You must define your data generator.')
         return None
     
-class tri_to_area(Problem): # takes input of triange vertices and finds area
-    def __init__(self, npts=6, nbatch=None):
-        super().__init__()
 
-    def get_input_and_target(self):
-        nbatch = self.nbatch
-        npts = self.npts
-        #
-        # The following really just limits the range of x, and then flips the 
-        #    sign, to generate y. 
-        #
-        x = np.random.normal(size=(nbatch,npts))
-        
-        area_np = np.zeros((128)) #create a empty numpy for new batches
-        
-
-        def distance(x1,y1,x2,y2): #this function finds the distance between each pair
-            length = np.sqrt(((x1-x2)**2) + ((y1 -y2)**2))
-            return length
-
-        
-        def get_areas(x): #this functions get the areas of all the examples
-            for i in range (nbatch):
-                
-                x1,y1 = x[i][0],x[i][1]
-                x2,y2 = x[i][2],x[i][3]
-                x3,y3 = x[i][4],x[i][5]
-                
-                side1= distance(x1,y1,x2,y2)
-                side2= distance(x1,y1,x3,y3)
-                side3= distance(x3,y3,x2,y2)
-                
-                sp = (side1 +side2 +side3)/2
-                
-                area = np.sqrt((sp*(sp-side1)*(sp-side2)*(sp-side3)))
-                area_np[i] = area
-            return area_np
-
-        return self.move_to_torch(x, get_areas(x).reshape((nbatch,1)))
     
 class x0_dist_x1(Problem): # target the input squared
                         #   But see below!
@@ -139,7 +100,7 @@ class x_triple_x(Problem): # target the input squared
 
 
 class roots_of_poly(Problem):
-    def __init__(self, npts=None, nbatch=None,**kwargs):
+    def __init__(self,**kwargs):
         super().__init__()
 
     def get_input_and_target(self):
@@ -198,7 +159,46 @@ class opp_cos(Problem): # target is opposite of cosine of input. Why not?
         y = -x.to(torch.float32)
         
         return x,y
-   
+
+class tri_to_area(Problem): # takes input of triange vertices and finds area
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def get_input_and_target(self):
+        nbatch = self.nbatch
+        npts = self.npts
+        #
+        # The following really just limits the range of x, and then flips the 
+        #    sign, to generate y. 
+        #
+        x = np.random.normal(size=(nbatch,npts))
+        
+        area_np = np.zeros((128)) #create a empty numpy for new batches
+        
+        
+        def distance(x1,y1,x2,y2): #this function finds the distance between each pair
+            length = np.sqrt(((x1-x2)**2) + ((y1 -y2)**2))
+            return length
+
+        
+        def get_areas(x): #this functions get the areas of all the examples
+            for i in range (nbatch):
+                
+                x1,y1 = x[i][0],x[i][1]
+                x2,y2 = x[i][2],x[i][3]
+                x3,y3 = x[i][4],x[i][5]
+                
+                side1= distance(x1,y1,x2,y2)
+                side2= distance(x1,y1,x3,y3)
+                side3= distance(x3,y3,x2,y2)
+                
+                sp = (side1 +side2 +side3)/2
+                
+                area = np.sqrt((sp*(sp-side1)*(sp-side2)*(sp-side3)))
+                area_np[i] = area
+            return area_np
+
+        return self.move_to_torch(x, get_areas(x).reshape((nbatch,1)))
 
 
 class plain_sum_of_x(Problem):

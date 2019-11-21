@@ -25,11 +25,14 @@ class one_linear_layer(nn.Module):
             self.npts = 50
         if nbatch is None:
             self.nbatch = 128
+    
+        self.npts = npts
+        self.nbatch = nbatch    
         
         self.L1 = nn.Linear(self.npts,1)
        
     def forward(self,x):
-        return torch.squeeze(self.L1(x))
+        return self.L1(x)
 
 class one_linear_layer_to_n(nn.Module):
     def __init__(self, npts=None, nbatch=None):
@@ -43,7 +46,7 @@ class one_linear_layer_to_n(nn.Module):
         self.L1 = nn.Linear(self.npts,self.npts)
        
     def forward(self,x):
-        return torch.squeeze(self.L1(x))
+        return self.L1(x)
 
      
 class bisect_to_power_of_two(nn.Module):
