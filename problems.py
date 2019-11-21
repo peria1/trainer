@@ -21,7 +21,8 @@ The subclasses here, in their init methods, take care of things like special
 
 """
 class Problem():
-    def __init__(self, npts=None, nbatch=None):
+    def __init__(self, npts=None, nbatch=None,**kwargs):
+        
         if npts:
             self.npts = npts
         else:
@@ -32,9 +33,32 @@ class Problem():
         else:
             self.nbatch = 128
 
+    def move_to_torch(self, input, target):
+        input = torch.from_numpy(input).to(torch.float32)
+        target = torch.from_numpy(target).to(torch.float32)
+        return input, target
+
     def get_input_and_target(self):
         print('You must define your data generator.')
         return None
+
+
+
+class roots_of_poly(Problem):
+    def __init__(self, npts=None, nbatch=None,**kwargs):
+        super().__init__()
+
+    def get_input_and_target(self):
+    
+        x = np.random.normal(size=(self.nbatch,self.npts))
+        y = np.zeros_like(x); y = np.concatenate((y,y),axis=1); y = y[:,:-2]
+        for i in range(self.nbatch):
+            r = np.roots(x[i,:])
+            y[i,0:self.npts-1] = np.real(r)
+            y[i,self.npts-1:] = np.imag(r)
+
+        return self.move_to_torch(x,y)
+
 
 class x_double_x(Problem): # target the input squared
                         #   But see below!
@@ -88,16 +112,9 @@ class plain_sum_of_x(Problem):
         super().__init__(**kwargs)
  
     def get_input_and_target(self):
-        nbatch = self.nbatch
-        npts = self.npts
-        x = np.random.normal(size=(nbatch,npts))
-    
-        x = torch.from_numpy(x)
-        y = torch.sum(x,1).to(torch.float32)
-        
-        x = x.to(torch.float32)
-        
-        return x,y
+        x = np.random.normal(size=(self.nbatch,self.npts))
+        y = np.sum(x,axis=1,keepdims=True)
+        return self.move_to_torch(x,y)
 
 class quad_sum_of_x(Problem):
     def __init__(self,**kwargs):
