@@ -178,7 +178,6 @@ def svd_weight_plot(viewer, d):
         axcolor = 'lightgoldenrodyellow'
         plt.figure(d.fig.number);
         plt.subplots_adjust(left=0.4)
-        d.ax.set_axis_off()
         rax = plt.axes([0.05, 0.05, 0.15, 0.9], facecolor=axcolor)
         d.radio = RadioButtons(rax, d.layer_names)
 
@@ -196,15 +195,10 @@ def svd_weight_plot(viewer, d):
                 
         d.radio.on_clicked(set_layer_and_update)
         d.plt = plt
-#        d.cbar_axis = d.plt.axes([0.25, 0.05, 0.05, 0.9])
 
     im = d.plist[d.layer_to_show][1].cpu().detach().numpy()
-#    d.ax.set_axis_off()
-#    d.mappable = d.ax.imshow(im)
     _,s,_ = d.np.linalg.svd(im)
     d.ax.plot(s)
     d.ax.set_title(d.layer_names[d.layer_to_show])
-#    d.cbar_axis.clear()
-#    d.plt.colorbar(mappable=d.mappable, cax=d.cbar_axis)
     d.fig.canvas.draw()
     d.fig.canvas.flush_events()
