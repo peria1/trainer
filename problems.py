@@ -55,24 +55,18 @@ class x0_dist_x1(Problem): # target the input squared
         #    sign, to generate y. 
         #
         x = np.random.normal(size=(nbatch,npts))
-        
         half = npts//2
+        dist = np.sqrt(np.sum(np.power((x[:,0:half] - x[:,half:]),2),\
+                              axis=1,keepdims=True))
         
-        dist = np.sqrt(np.sum(np.power((x[:,0:half] - x[:,half:]),2),axis=1))
+#        x = torch.from_numpy(x)
+#        x = x.to(torch.float32)
+#        y = dist
+#        y = torch.from_numpy(y)
+#        y = y.to(torch.float32).reshape((nbatch,1))
+#        
         
-        
-        
-#        alpha = np.random.normal(size=(nbatch,npts))
-#        y = #alpha * y
-        
-        x = torch.from_numpy(x)
-        x = x.to(torch.float32)
-        y = dist
-        y = torch.from_numpy(y)
-        y = y.to(torch.float32).reshape((nbatch,1))
-        
-        
-        return x,y
+        return self.move_to_torch(x, dist)
 
 
 class x_triple_x(Problem): # target the input squared
