@@ -41,9 +41,16 @@ class trainer_view():
         self.fig.canvas.manager.window.raise_() # Trying to make windows visible right away
         
         self.trainer = tr.trainer(*args, **kwargs, viewer=self)
+        if not self.trainer:
+            print('Something went wrong instantiating trainer.')
+            return None
+
+        if not self.trainer.model:
+            print('Problem instantiating model.')
+            return None
+        
         self.trainer.pause = False
         self.update_plots = False
-
         #
         #  Available displays...feel free to add more!
         #
@@ -56,9 +63,11 @@ class trainer_view():
                                                update=tp.weight_plot),\
                          self.Training_Display(name='dataflow',  \
                                                update=tp.dataflow_plot)]
+#                         self.Training_Display(name='magnitudes',\
+#                                               update=tp.numbers_check)]
                          
         if self.trainer.ytest.size() == self.trainer.xtest.size():
-            print('adding examples...')
+            print('adding examples plot...')
             self.displays.append(self.Training_Display(name='examples', active = False,\
                                                update=tp.example_plot))
 
