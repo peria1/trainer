@@ -61,9 +61,10 @@ class trainer():
         try:
             assert(self.model(self.xtest).size()==self.ytest.size())
         except AssertionError:
-            print('Model predictons need to have the same dimensions as the targets.')
+            print('Model predictions need to have the same dimensions as the targets.')
             print('Prediction: ', self.model(self.xtest).size())
             print('Target: ', self.ytest.size())
+            self.model = None
             return
         
         if 'custom_loss' in dir(self.model):
