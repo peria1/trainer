@@ -19,7 +19,7 @@ from torch import nn
 
 class one_linear_layer(nn.Module):
     def __init__(self, npts=None, nbatch=None):
-        super(one_linear_layer, self).__init__()
+        super().__init__()
 
         if npts is None:
             self.npts = 50
@@ -46,26 +46,29 @@ class one_linear_layer_to_n(nn.Module):
         return torch.squeeze(self.L1(x))
 
      
-class bisect_to_one(nn.Module):
-    def __init__(self, npts=None, nbatch=None):  # trying to see if machine can tell that y is the sum over x 
-        super(bisect_to_one, self).__init__()
+class bisect_to_power_of_two(nn.Module):
+    def __init__(self, npts=None, nbatch=None,nout=None):  # trying to see if machine can tell that y is the sum over x 
+        super().__init__()
 
         if npts is None:
             npts = 64
         if nbatch is None:
             nbatch = 128
+        if nout is None:
+            nout = 1
         
+        nchk = npts*nout
         try:
-            assert((npts != 0) and (npts & (npts-1) == 0))
+            assert((nchk != 0) and (nchk & (nchk-1) == 0))
         except AssertionError:
-            print('Number of points in each example must be a power of two')
+            print('Length of both input and output examples must be a power of two.')
         
         self.npts = npts
         self.nbatch = nbatch
         
         n = npts*2
         self.layer_list = nn.ModuleList([nn.Linear(npts,n)])
-        while n > 2:
+        while n > nout:
             self.layer_list.append(nn.Linear(n,n//2))
             n//=2
         self.leaky = nn.LeakyReLU()
@@ -177,6 +180,54 @@ class n_double_one(nn.Module):  # moved to n_double_one
         self.Llast = nn.Linear(width_factor*npts, npts)
         
         self.weight_vector = nn.Linear(npts, 1) # npts is the size of each 1D example
+        
+        self.leaky = nn.LeakyReLU()
+
+        
+    def forward(self, x):
+        dataflow = x
+        dataflow = self.leaky(self.L1(dataflow))
+        dataflow = self.leaky(self.L2(dataflow))
+        dataflow = self.leaky(self.L3(dataflow))
+        dataflow = self.leaky(self.L4(dataflow))
+        dataflow = self.leaky(self.L5(dataflow))
+        dataflow = self.leaky(self.L6(dataflow))
+        dataflow = self.leaky(self.L7(dataflow))
+        dataflow = self.leaky(self.Llast(dataflow))
+        result = self.weight_vector(dataflow)
+        return result
+
+
+
+class n_double_nout(nn.Module):  # moved to n_double_one
+    def __init__(self, npts=None, nbatch=None,nout=None):  # trying to see if machine can tell that y is the sum over x 
+        super().__init__()
+
+
+        self.custom_loss = nn.L1Loss()
+        
+        if npts is None:
+            npts = 50
+        if nbatch is None:
+            nbatch = 128
+        if nout is None:
+            nout = npts
+        
+        
+        self.npts = npts
+        self.nbatch = nbatch
+        width_factor = 2
+#        self.bn1 = nn.BatchNorm1d(npts)
+        self.L1 = nn.Linear(npts, width_factor*npts)
+        self.L2 = nn.Linear(width_factor*npts, width_factor*npts)
+        self.L3 = nn.Linear(width_factor*npts, width_factor*npts)
+        self.L4 = nn.Linear(width_factor*npts, width_factor*npts)
+        self.L5 = nn.Linear(width_factor*npts, width_factor*npts)
+        self.L6 = nn.Linear(width_factor*npts, width_factor*npts)
+        self.L7 = nn.Linear(width_factor*npts, width_factor*npts)
+        self.Llast = nn.Linear(width_factor*npts, npts)
+        
+        self.weight_vector = nn.Linear(npts, nout) # npts is the size of each 1D example
         
         self.leaky = nn.LeakyReLU()
 
