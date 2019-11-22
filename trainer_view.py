@@ -69,7 +69,7 @@ class trainer_view():
 #                                               update=tp.numbers_check)]
                          
         if self.trainer.ytest.size() == self.trainer.xtest.size():
-            print('adding examples plot...')
+#            print('adding examples plot...')
             self.displays.append(self.Training_Display(name='examples', active = False,\
                                                update=tp.example_plot))
 
