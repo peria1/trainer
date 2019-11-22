@@ -21,7 +21,7 @@ The subclasses here, in their init methods, take care of things like special
 
 """
 class Problem():
-    def __init__(self, npts=None, nbatch=None,**kwargs):
+    def __init__(self, npts=None, nbatch=None, nout=None, **kwargs):
         if npts:
             self.npts = npts
         else:
@@ -101,7 +101,7 @@ class x_triple_x(Problem): # target the input squared
 
 class roots_of_poly(Problem):
     def __init__(self,**kwargs):
-        super().__init__()
+        super().__init__(**kwargs)
 
     def get_input_and_target(self):
     
