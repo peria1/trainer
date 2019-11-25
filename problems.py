@@ -41,6 +41,19 @@ class Problem():
         print('You must define your data generator.')
         return None
     
+class circumference(Problem): # takes input of triange vertices and finds area
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def get_input_and_target(self):
+        nbatch = self.nbatch
+        npts = self.npts
+        #
+        r = np.random.normal(size=(nbatch,npts))
+        c = 6.28 * r
+        
+        return self.move_to_torch(r,c)
+    
 class tri_to_perimeter(Problem): # takes input of triange vertices and finds area
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
