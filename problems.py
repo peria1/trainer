@@ -26,7 +26,7 @@ class Problem():
             self.npts = npts
         else:
             self.npts = 50
-            
+       
         if nbatch:
             self.nbatch = nbatch
         else:
@@ -41,12 +41,50 @@ class Problem():
         print('You must define your data generator.')
         return None
     
+class tri_to_perimeter(Problem): # takes input of triange vertices and finds area
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def get_input_and_target(self):
+        nbatch = self.nbatch
+        npts = self.npts
+        #
+        # The following really just limits the range of x, and then flips the 
+        #    sign, to generate y. 
+        #
+        x = np.random.normal(size=(nbatch,npts))
+        
+        perimeter_np = np.zeros((128)) #create a empty numpy for new batches
+        
+        
+        def distance(x1,y1,x2,y2): #this function finds the distance between each pair
+            length = np.sqrt(((x1-x2)**2) + ((y1 -y2)**2))
+            return length
+
+        
+        def get_perimeter(x): #this functions get the areas of all the examples
+            for i in range (nbatch):
+                
+                x1,y1 = x[i][0],x[i][1]
+                x2,y2 = x[i][2],x[i][3]
+                x3,y3 = x[i][4],x[i][5]
+                
+                side1= distance(x1,y1,x2,y2)
+                side2= distance(x1,y1,x3,y3)
+                side3= distance(x3,y3,x2,y2)
+                
+                perimeter = side1 + side2 + side3
+                
+                perimeter_np[i] = perimeter
+            return perimeter_np
+
+        return self.move_to_torch(x, get_perimeter(x).reshape((nbatch,1)))
 
     
 class x0_dist_x1(Problem): # target the input squared
                         #   But see below!
-    def __init__(self, npts=None, nbatch=None):
-        super().__init__()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
     def get_input_and_target(self):
         nbatch = self.nbatch
@@ -72,8 +110,8 @@ class x0_dist_x1(Problem): # target the input squared
 
 class x_triple_x(Problem): # target the input squared
                         #   But see below!
-    def __init__(self, npts=None, nbatch=None):
-        super().__init__()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
     def get_input_and_target(self):
         nbatch = self.nbatch
@@ -117,8 +155,8 @@ class roots_of_poly(Problem):
 
 class x_double_x(Problem): # target the input squared
                         #   But see below!
-    def __init__(self, npts=None, nbatch=None):
-        super().__init__()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
     def get_input_and_target(self):
         nbatch = self.nbatch
@@ -141,8 +179,8 @@ class x_double_x(Problem): # target the input squared
 
 class opp_cos(Problem): # target is opposite of cosine of input. Why not? 
                         #   But see below!
-    def __init__(self, npts=None, nbatch=None):
-        super().__init__()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
     def get_input_and_target(self):
         nbatch = self.nbatch
@@ -165,15 +203,17 @@ class tri_to_area(Problem): # takes input of triange vertices and finds area
         super().__init__(**kwargs)
 
     def get_input_and_target(self):
+        
         nbatch = self.nbatch
         npts = self.npts
+   
         #
         # The following really just limits the range of x, and then flips the 
         #    sign, to generate y. 
         #
         x = np.random.normal(size=(nbatch,npts))
         
-        area_np = np.zeros((128)) #create a empty numpy for new batches
+        area_np = np.zeros((nbatch)) #create a empty numpy for new batches
         
         
         def distance(x1,y1,x2,y2): #this function finds the distance between each pair
