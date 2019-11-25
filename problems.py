@@ -21,7 +21,7 @@ The subclasses here, in their init methods, take care of things like special
 
 """
 class Problem():
-    def __init__(self, npts=None, nbatch=None,**kwargs):
+    def __init__(self, npts=None, nbatch=None, nout=None, **kwargs):
         if npts:
             self.npts = npts
         else:

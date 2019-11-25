@@ -32,7 +32,12 @@ def weight_plot(viewer, d):
     if d.first:
         import matplotlib.pyplot as plt
         from matplotlib.widgets import RadioButtons
-                
+        import torch
+        import numpy as np
+        
+        d.np = np
+        
+        d.torch = torch
         d.plist = viewer.trainer.get_named_weight_list()
         d.layer_names = [n for n,p in d.plist]
         axcolor = 'lightgoldenrodyellow'
@@ -58,7 +63,14 @@ def weight_plot(viewer, d):
         d.plt = plt
         d.cbar_axis = d.plt.axes([0.25, 0.05, 0.05, 0.9])
 
+#    for i,p in enumerate(d.plist):
+#        mu = d.torch.mean(d.plist[i][1])
+#        std = d.torch.std(d.plist[i][1])
+#        d.radio.labels[i].set_text(d.layer_names[i]+':'+str(mu)+':'+str(std))
+        
     im = d.plist[d.layer_to_show][1].cpu().detach().numpy()
+#    print(d.np.sum(d.np.abs(im)))
+    
     d.ax.set_axis_off()
     d.mappable = d.ax.imshow(im)
     d.ax.set_title(d.layer_names[d.layer_to_show])
