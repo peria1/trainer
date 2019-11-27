@@ -25,7 +25,7 @@ class trainer():
         #
         
         if not max_loss:
-            max_loss = 1e30 
+            max_loss = 0.0
         self.max_loss = max_loss
 
         if not min_pval:
