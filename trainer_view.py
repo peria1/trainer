@@ -102,7 +102,7 @@ class trainer_view():
     
         ax_loss_box = plt.axes([text_box_left_edge, down_from_top[0], text_box_width, height]) # left, bottom, width, height
         self.loss_box = TextBox(ax_loss_box, 'Max Loss: ', \
-                              initial=str(1e30))
+                              initial=str(self.trainer.max_loss))
         self.loss_box.on_submit(self.set_max_loss)
 
         ax_pval_box = plt.axes([text_box_left_edge, down_from_top[1], text_box_width, height]) # left, bottom, width, height
@@ -151,9 +151,7 @@ class trainer_view():
         self.reset_button.on_clicked(self.reset_model)
     
     def reset_model(self, event):
-        print('not yet',type(event))
-        self.reinit = event
-        pass
+        self.trainer.reset_model()
         
     def clear_history(self,event):
         self.trainer.zap_history()
