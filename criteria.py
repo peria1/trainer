@@ -35,3 +35,7 @@ def target_residual_correlation(yhat,y):
 def mse_plus_corr(yhat,y):
     mse = nn.MSELoss()
     return mse(yhat,y) + target_residual_correlation(yhat,y)
+
+def L1_plus_corr(yhat,y):
+    L1 = nn.L1Loss()
+    return L1(yhat,y) + target_residual_correlation(yhat,y)
