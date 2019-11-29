@@ -181,9 +181,12 @@ class trainer():
         return x.to(self.device), y.to(self.device)
     
     def zap_history(self):
+        state = self.pause
+        self.pause = True
         self.train_loss_history = []
         self.test_loss_history = []
         self.p_history = []
+        self.pause = state
 
     def get_model_name(self):
         func_rep = str(self.model)
@@ -195,5 +198,16 @@ class trainer():
      
     def get_named_weight_list(self):
         return [(n,p) for (n,p) in self.model.named_parameters() if '.weight' in n]
+    
+    def reset_model(self):
+        def weights_init(m):
+            if isinstance(m, nn.Conv2d):
+                torch.nn.init.xavier_uniform(m.weight.data)
+            if isinstance(m,nn.Linear):
+                m.reset_parameters()
+        state = self.pause
+        self.pause = True
+        self.model.apply(weights_init)
+        self.pause = state
 
 
