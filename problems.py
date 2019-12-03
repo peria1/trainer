@@ -7,6 +7,7 @@ Created on Sat Nov  9 07:31:52 2019
 import torch
 import numpy as np
 import torch.utils.data
+from torchvision import datasets, transforms
 """
 The superclass Problem takes care of things common to all of our "math 
     problem" data sets, like default dimensions and the requirement to 
@@ -21,7 +22,7 @@ The subclasses here, in their init methods, take care of things like special
 
 """
 class Problem():
-    def __init__(self, npts=None, nbatch=None, nout=None, **kwargs):
+    def __init__(self, npts=None, nbatch=None,**kwargs):
         if npts:
             self.npts = npts
         else:
@@ -41,6 +42,54 @@ class Problem():
         print('You must define your data generator.')
         return None
     
+class MNST_sum(Problem): # target the input squared
+                        #   But see below!
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+   
+        
+
+    def get_input_and_target(self):
+        nbatch = self.nbatch
+        npts = self.npts
+        
+        half = nbatch
+        MNST_batchsize = nbatch *2 #using half pairs
+        
+        sum_digits = torch.zeros(half)
+        
+        kwargs = {'num_workers': 1, 'pin_memory': True}
+        
+        train_loader = torch.utils.data.DataLoader(
+                datasets.MNIST('../data', train=True, download=True,
+                               transform=transforms.ToTensor()),
+                               batch_size=MNST_batchsize, shuffle=True, **kwargs)
+        def sum_of_digits(x0,x1):
+            for i in range (half):
+                sum_digits[i] = x0[i] + x1[i]
+            return sum_digits
+        
+        for batch_idx, (data, which_digit) in enumerate(train_loader):
+            datax0 = data[:half,:,:,:]
+            datax1 = data[half:,:,:,:]
+            
+            which_digitx0=which_digit[:half]
+            which_digitx1=which_digit[half:]
+#            print(data.size())
+#            print(datax0.size())
+#            print(datax1.size())
+            digit_total = sum_of_digits(which_digitx0,which_digitx1)
+            x0_to_x1 = torch.cat((datax0.squeeze(),datax1.squeeze()),1)
+            
+            xs = x0_to_x1.size()
+            self.npts = xs[1] * xs[2]
+            
+            x0_to_x1 = x0_to_x1.view(-1,self.npts)
+            break
+            
+            
+        return x0_to_x1,digit_total.reshape((nbatch,1))
+
 class circumference(Problem): # takes input of triange vertices and finds area
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -50,7 +99,7 @@ class circumference(Problem): # takes input of triange vertices and finds area
         npts = self.npts
         #
         r = np.random.normal(size=(nbatch,npts))
-        c = 6.28 * r
+        c = 2 * np.pi * r
         
         return self.move_to_torch(r,c)
     
