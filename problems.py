@@ -118,7 +118,7 @@ class MNST_sum(Problem): # target the input squared
             
         return x0_to_x1,digit_total.reshape((nbatch,1))
 
-class circumference(Problem): # takes input of triange vertices and finds area
+class circumference(Problem): # takes input radius and finds circumference of circle
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -131,7 +131,7 @@ class circumference(Problem): # takes input of triange vertices and finds area
         
         return self.move_to_torch(r,c)
     
-class tri_to_perimeter(Problem): # takes input of triange vertices and finds area
+class tri_to_perimeter(Problem): # takes input of triangle vertices and finds perimeter
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -187,45 +187,21 @@ class x0_dist_x1(Problem): # target the input squared
         half = npts//2
         dist = np.sqrt(np.sum(np.power((x[:,0:half] - x[:,half:]),2),\
                               axis=1,keepdims=True))
-        
-#        x = torch.from_numpy(x)
-#        x = x.to(torch.float32)
-#        y = dist
-#        y = torch.from_numpy(y)
-#        y = y.to(torch.float32).reshape((nbatch,1))
-#        
-        
+                
         return self.move_to_torch(x, dist)
 
 
-class x_triple_x(Problem): # target the input squared
-                        #   But see below!
+class x_triple_x(Problem): # target is the cube of the input
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
     def get_input_and_target(self):
         nbatch = self.nbatch
         npts = self.npts
-        #
-        # The following really just limits the range of x, and then flips the 
-        #    sign, to generate y. 
-        #
         x = np.random.normal(size=(nbatch,npts))
-        
-    
         y = np.power(x,3)
-#        alpha = np.random.normal(size=(nbatch,npts))
-#        y = #alpha * y
-        
-        x = torch.from_numpy(x)
-        x = x.to(torch.float32)
-        y = torch.from_numpy(y)
-        y = y.to(torch.float32)
-        
-        return x,y
-
-
-
+                
+        return self.move_to_torch(x,y)
 
 class roots_of_poly(Problem):
     def __init__(self,**kwargs):
@@ -242,29 +218,19 @@ class roots_of_poly(Problem):
 
         return self.move_to_torch(x,y)
 
-
 class x_double_x(Problem): # target the input squared
-                        #   But see below!
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
     def get_input_and_target(self):
         nbatch = self.nbatch
         npts = self.npts
-        #
-        # The following really just limits the range of x, and then flips the 
-        #    sign, to generate y. 
-        #
+
         x = np.random.normal(size=(nbatch,npts))    
         alpha = np.random.uniform(size=(nbatch,1))
         y = alpha*x*x
-        
-        y = torch.from_numpy(y)
-        y = y.to(torch.float32)
-        x = torch.from_numpy(x)
-        x = x.to(torch.float32)
-       
-        return x,y
+
+        return self.move_to_torch(x,y)
    
 
 class opp_cos(Problem): # target is opposite of cosine of input. Why not? 
@@ -281,12 +247,9 @@ class opp_cos(Problem): # target is opposite of cosine of input. Why not?
         #
         x = np.random.normal(size=(nbatch,npts))
         x = np.cos(x)
-        x = torch.from_numpy(x)
-        x = x.to(torch.float32)
+        y = -x
     
-        y = -x.to(torch.float32)
-        
-        return x,y
+        return self.move_to_torch(x,y)
 
 class tri_to_area(Problem): # takes input of triange vertices and finds area
     def __init__(self, **kwargs):
@@ -297,14 +260,9 @@ class tri_to_area(Problem): # takes input of triange vertices and finds area
         nbatch = self.nbatch
         npts = self.npts
    
-        #
-        # The following really just limits the range of x, and then flips the 
-        #    sign, to generate y. 
-        #
         x = np.random.normal(size=(nbatch,npts))
         
         area_np = np.zeros((nbatch)) #create a empty numpy for new batches
-        
         
         def distance(x1,y1,x2,y2): #this function finds the distance between each pair
             length = np.sqrt(((x1-x2)**2) + ((y1 -y2)**2))
@@ -448,10 +406,8 @@ class cumulative_sum_of_x(Problem): # moved to n_double_n
         x = np.random.uniform(low=-xrange, high=xrange, size=xsize)
         bias = np.random.uniform(low=-xrange/10, high=xrange/10,size=(nbatch,1))
         y = np.cumsum(x+bias,axis=1)
-        x = torch.from_numpy(x).to(torch.float)
-        y = torch.from_numpy(y).to(torch.float)
         
-        return x, y
+        return self.move_to_torch(x,y)
 
 
 

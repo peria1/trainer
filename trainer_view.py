@@ -80,7 +80,7 @@ class trainer_view():
         width = 0.3
         height = 0.075
         text_color = 'white'
-        down_from_top = [0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2]
+        down_from_top = [0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2,0.1]
         
         plt.figure(self.fig.number)
         
@@ -102,7 +102,7 @@ class trainer_view():
     
         ax_loss_box = plt.axes([text_box_left_edge, down_from_top[0], text_box_width, height]) # left, bottom, width, height
         self.loss_box = TextBox(ax_loss_box, 'Max Loss: ', \
-                              initial=str(1e30))
+                              initial=str(self.trainer.max_loss))
         self.loss_box.on_submit(self.set_max_loss)
 
         ax_pval_box = plt.axes([text_box_left_edge, down_from_top[1], text_box_width, height]) # left, bottom, width, height
@@ -142,6 +142,16 @@ class trainer_view():
         self.clear_button.label.set_fontweight('bold')
         self.clear_button.color = 'black'
         self.clear_button.on_clicked(self.clear_history)
+
+        resetbutton = plt.axes([left_edge, down_from_top[7], width, height])
+        self.reset_button = Button(resetbutton, 'Re-initialize')
+        self.reset_button.label.set_color(text_color)
+        self.reset_button.label.set_fontweight('bold')
+        self.reset_button.color = 'black'
+        self.reset_button.on_clicked(self.reset_model)
+    
+    def reset_model(self, event):
+        self.trainer.reset_model()
         
     def clear_history(self,event):
         self.trainer.zap_history()
