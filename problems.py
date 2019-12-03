@@ -22,7 +22,7 @@ The subclasses here, in their init methods, take care of things like special
 
 """
 class Problem():
-    def __init__(self, npts=None, nbatch=None,**kwargs):
+    def __init__(self, npts=None, nbatch=None, nout=None, **kwargs):
         if npts:
             self.npts = npts
         else:
@@ -41,6 +41,34 @@ class Problem():
     def get_input_and_target(self):
         print('You must define your data generator.')
         return None
+    
+    
+class MNST(Problem): # implenenting the MNST problem
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+   
+        
+
+    def get_input_and_target(self):
+        nbatch = self.nbatch
+        npts = self.npts
+        
+        kwargs = {'num_workers': 1, 'pin_memory': True}
+        
+        train_loader = torch.utils.data.DataLoader(
+                datasets.MNIST('../data', train=True, download=True,
+                               transform=transforms.ToTensor()),
+                               batch_size=nbatch, shuffle=True, **kwargs)
+
+        for batch_idx, (data, which_digit) in enumerate(train_loader):
+            xs = data.size()
+            self.npts = xs[2] * xs [3]
+            data = data.view(-1,self.npts)
+            which_digit = which_digit.reshape(nbatch,1).to(torch.float32)
+            break
+            
+            
+        return data,which_digit
     
 class MNST_sum(Problem): # target the input squared
                         #   But see below!
