@@ -34,13 +34,25 @@ class trainer():
         
         self.set_device()
 
-        trainee = trainee_class(**kwargs).to(self.device)
-        self.model = trainee # a trainee needs an optimzer and a criterion, 
-                                           #   as well as a way to generate data.
         self.problem = problem_class(**kwargs)
                    
         self.data_generator = self.problem.get_input_and_target
                             
+        self.xtest, self.ytest = self.data_generator()
+        self.xtest = self.xtest.to(self.device)
+        self.ytest = self.ytest.to(self.device)
+        
+        if 'npts' in kwargs:
+            self.npts = kwargs['npts']
+            kwargs.pop('npts')
+        else:
+            self.npts = self.xtest.size()[1]
+        
+
+        trainee = trainee_class(**kwargs,npts=self.npts).to(self.device)
+        self.model = trainee # a trainee needs an optimzer and a criterion, 
+                                           #   as well as a way to generate data.
+
         self.model.to(self.device)
         if viewer:
             self.viewer = viewer
@@ -54,9 +66,6 @@ class trainer():
         if reload:  # does not work on Windows, can't get Tk to work
             self.model.load_state_dict(torch.load(uichoosefile()))
                      
-        self.xtest, self.ytest = self.data_generator()
-        self.xtest = self.xtest.to(self.device)
-        self.ytest = self.ytest.to(self.device)
 
         try:
             assert(self.model(self.xtest).size()==self.ytest.size())
