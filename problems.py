@@ -210,11 +210,13 @@ class roots_of_poly(Problem):
     def get_input_and_target(self):
     
         x = np.random.normal(size=(self.nbatch,self.npts))
-        y = np.zeros_like(x); y = np.concatenate((y,y),axis=1); y = y[:,:-2]
+        y = np.zeros_like(x); y = np.concatenate((y,y),axis=1);
+        
+        xaug = np.concatenate((np.ones((self.nbatch,1)),x),axis=1)
         for i in range(self.nbatch):
-            r = np.roots(x[i,:])
-            y[i,0:self.npts-1] = np.real(r)
-            y[i,self.npts-1:] = np.imag(r)
+            r = np.roots(xaug[i,:])
+            y[i,0:self.npts] = np.real(r)
+            y[i,self.npts:] = np.imag(r)
 
         return self.move_to_torch(x,y)
 
