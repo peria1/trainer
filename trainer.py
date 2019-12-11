@@ -47,9 +47,16 @@ class trainer():
             kwargs.pop('npts')
         else:
             self.npts = self.xtest.size()[1]
+            
+        if 'nout' in kwargs:
+            self.nout = kwargs['nout']
+            kwargs.pop('nout')
+        else:
+            self.nout = self.ytest.size()[1]
         
 
-        trainee = trainee_class(**kwargs,npts=self.npts).to(self.device)
+        trainee = \
+        trainee_class(**kwargs,npts=self.npts,nout=self.nout).to(self.device)
         self.model = trainee # a trainee needs an optimzer and a criterion, 
                                            #   as well as a way to generate data.
 
