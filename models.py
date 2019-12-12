@@ -19,7 +19,7 @@ import torch.utils.data
 from torch import nn
 
 class one_linear_layer(nn.Module):
-    def __init__(self, npts=None, nbatch=None):
+    def __init__(self, npts=None, nbatch=None, nout=None):
         super().__init__()
 
         if npts is None:
@@ -36,7 +36,7 @@ class one_linear_layer(nn.Module):
         return self.L1(x)
 
 class one_linear_layer_to_n(nn.Module):
-    def __init__(self, npts=None, nbatch=None):
+    def __init__(self, npts=None, nbatch=None, nout=None):
         super().__init__()
 
         if npts is None:
@@ -87,7 +87,7 @@ class bisect_to_power_of_two(nn.Module):
 
 
 class n_double_n_act(nn.Module): # moved to n_double_n
-    def __init__(self, npts=None, nbatch=None): 
+    def __init__(self, npts=None, nbatch=None, nout=None): 
         super().__init__()
 
         if npts is None:
@@ -125,7 +125,7 @@ class n_double_n_act(nn.Module): # moved to n_double_n
 
 
 class n_double_n(nn.Module): # moved to n_double_n
-    def __init__(self, npts=None, nbatch=None): 
+    def __init__(self, npts=None, nbatch=None, nout=None): 
         super().__init__()
 
         if npts is None:
@@ -160,7 +160,7 @@ class n_double_n(nn.Module): # moved to n_double_n
         return dataflow
 
 class n_double_one(nn.Module):  # moved to n_double_one
-    def __init__(self, npts=None, nbatch=None):  # trying to see if machine can tell that y is the sum over x 
+    def __init__(self, npts=None, nbatch=None, nout=None):  # trying to see if machine can tell that y is the sum over x 
         super().__init__()
 
         self.custom_loss = nn.L1Loss()
