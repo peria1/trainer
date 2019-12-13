@@ -25,6 +25,7 @@ def decorrelate_target_residuals(yhat,y):
 #tht = 0.5 * (1i/2)*(log(1-1i*z) - log(1+1i*z));
     
 def target_residual_correlation(yhat,y):
+        
     res = yhat - y;
     dx = res - torch.mean(res,1,keepdim=True)
     dy = y - torch.mean(y,1,keepdim=True)
@@ -36,6 +37,16 @@ def mse_plus_corr(yhat,y):
     mse = nn.MSELoss()
     return mse(yhat,y) + target_residual_correlation(yhat,y)
 
-def L1_plus_corr(yhat,y):
+def L1_plus_corr(yhat,y,alpha=None):
+    if not alpha:
+        alpha = 1.0
+
     L1 = nn.L1Loss()
-    return L1(yhat,y) + target_residual_correlation(yhat,y)
+    return L1(yhat,y) + alpha*target_residual_correlation(yhat,y)
+
+def diff_and_product(yhat,y):
+    L1 = nn.L1Loss()
+    return (1+target_residual_correlation(yhat,y))*L1(yhat,y)
+
+
+

@@ -13,12 +13,13 @@ Created on Sun Oct  6 07:32:17 2019
 
 
 """
+
 import torch
 import torch.utils.data
 from torch import nn
 
 class one_linear_layer(nn.Module):
-    def __init__(self, npts=None, nbatch=None):
+    def __init__(self, npts=None, nbatch=None, nout=None):
         super().__init__()
 
         if npts is None:
@@ -35,7 +36,7 @@ class one_linear_layer(nn.Module):
         return self.L1(x)
 
 class one_linear_layer_to_n(nn.Module):
-    def __init__(self, npts=None, nbatch=None):
+    def __init__(self, npts=None, nbatch=None, nout=None):
         super().__init__()
 
         if npts is None:
@@ -86,7 +87,7 @@ class bisect_to_power_of_two(nn.Module):
 
 
 class n_double_n_act(nn.Module): # moved to n_double_n
-    def __init__(self, npts=None, nbatch=None): 
+    def __init__(self, npts=None, nbatch=None, nout=None): 
         super().__init__()
 
         if npts is None:
@@ -124,7 +125,7 @@ class n_double_n_act(nn.Module): # moved to n_double_n
 
 
 class n_double_n(nn.Module): # moved to n_double_n
-    def __init__(self, npts=None, nbatch=None): 
+    def __init__(self, npts=None, nbatch=None, nout=None): 
         super().__init__()
 
         if npts is None:
@@ -159,7 +160,7 @@ class n_double_n(nn.Module): # moved to n_double_n
         return dataflow
 
 class n_double_one(nn.Module):  # moved to n_double_one
-    def __init__(self, npts=None, nbatch=None):  # trying to see if machine can tell that y is the sum over x 
+    def __init__(self, npts=None, nbatch=None, nout=None):  # trying to see if machine can tell that y is the sum over x 
         super().__init__()
 
         self.custom_loss = nn.L1Loss()
@@ -335,8 +336,56 @@ class vectorVAE(nn.Module):   # moved to vectorVAE
 
 
 #--------------------
+class TrainerRNN(nn.Module):
+    def __init__(self, npts=None, nbatch=None, nout=None):
+        super().__init__()
+        
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-class rnn(nn.Module):
+        if npts is None:
+            npts = 50
+        if nbatch is None:
+            nbatch = 128
+        if nout is None:
+            nout = npts
+        
+        self.input_size = npts
+        self.seq_len = nbatch
+        
+        self.hidden_dim = 2*self.input_size  
+        self.n_layers = 10
+        self.output_size = nout
+        
+        self.rnn = nn.GRU(self.input_size, self.hidden_dim, self.n_layers)
+        self.fc = nn.Linear(self.hidden_dim, self.output_size)
+
+    def forward(self, x):
+        
+        batch_size = 1
+        x = x.unsqueeze(1)
+
+        # Initializing hidden state for first input using method defined below
+        hidden = self.init_hidden(batch_size)
+
+        # Passing in the input and hidden state into the model and obtaining outputs
+        out, hidden = self.rnn(x, hidden)
+        
+        # Reshaping the outputs such that it can be fit into the fully connected layer
+        out = out.contiguous().view(-1, self.hidden_dim)
+        out = self.fc(out)
+        
+        return out
+    
+    def init_hidden(self, batch_size):
+        # This method generates the first hidden state of zeros which we'll use in the forward pass
+        # We'll send the tensor holding the hidden state to the device we specified earlier as well
+        hidden = torch.zeros(self.n_layers, batch_size, self.hidden_dim)
+        hidden = hidden.to(self.device)
+        return hidden
+         
+        #--------------------
+
+class RNN(nn.Module):
     def __init__(self, input_size, output_size, hidden_dim, n_layers):
         super().__init__()
 
@@ -346,13 +395,13 @@ class rnn(nn.Module):
 
         #Defining the layers
         # RNN Layer
-        self.rnn = nn.RNN(input_size, hidden_dim, n_layers, batch_first=True)   
+        self.rnn = nn.RNN(input_size, hidden_dim, n_layers)   
         # Fully connected layer
         self.fc = nn.Linear(hidden_dim, output_size)
     
     def forward(self, x):
         
-        batch_size = x.size(0)
+        batch_size = x.size(1)
 
         # Initializing hidden state for first input using method defined below
         hidden = self.init_hidden(batch_size)
@@ -371,3 +420,5 @@ class rnn(nn.Module):
         # We'll send the tensor holding the hidden state to the device we specified earlier as well
         hidden = torch.zeros(self.n_layers, batch_size, self.hidden_dim)
         return hidden
+    
+    

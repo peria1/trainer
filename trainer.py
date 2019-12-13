@@ -42,14 +42,23 @@ class trainer():
         self.xtest = self.xtest.to(self.device)
         self.ytest = self.ytest.to(self.device)
         
+        self.npts = None
+#        self.consume_keyword(kwargs, 'npts', self.npts, self.xtest.size()[1])
         if 'npts' in kwargs:
             self.npts = kwargs['npts']
             kwargs.pop('npts')
         else:
             self.npts = self.xtest.size()[1]
+            
+        if 'nout' in kwargs:
+            self.nout = kwargs['nout']
+            kwargs.pop('nout')
+        else:
+            self.nout = self.ytest.size()[1]
         
 
-        trainee = trainee_class(**kwargs,npts=self.npts).to(self.device)
+        trainee = \
+        trainee_class(**kwargs,npts=self.npts,nout=self.nout).to(self.device)
         self.model = trainee # a trainee needs an optimzer and a criterion, 
                                            #   as well as a way to generate data.
 
@@ -219,4 +228,10 @@ class trainer():
         self.model.apply(weights_init)
         self.pause = state
 
-
+#    def consume_keyword(keywords, keyword, member, value=None):
+#        if keyword in keywords:
+#            member = keywords[keyword]
+#            keywords.pop(keyword)
+#        else:
+#            member = value
+#        
