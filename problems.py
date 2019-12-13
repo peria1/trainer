@@ -8,6 +8,13 @@ import torch
 import numpy as np
 import torch.utils.data
 from torchvision import datasets, transforms
+
+
+from PIL import Image
+
+import skimage
+
+from skimage import transform
 """
 The superclass Problem takes care of things common to all of our "math 
     problem" data sets, like default dimensions and the requirement to 
@@ -42,6 +49,163 @@ class Problem():
         print('You must define your data generator.')
         return None
     
+class MNST_solver(Problem): # implenenting the MNST problem
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+   
+        
+
+    def get_input_and_target(self):
+        nbatch = self.nbatch
+#        npts = self.npts
+#
+        half = nbatch
+
+        
+        kwargs = {'num_workers': 1, 'pin_memory': True}
+        
+        train_loader = torch.utils.data.DataLoader(
+                datasets.MNIST('../data', train=True, download=True,
+                               transform=transforms.ToTensor()),
+                               batch_size= nbatch*2, shuffle=True, **kwargs)
+
+        for batch_idx, (data, which_digit) in enumerate(train_loader):
+            break
+        
+        def Image_Tensor(image):
+            rgb_image = pil2tensor(image)
+            np_image = skimage.transform.resize(rgb_image.numpy(), (3,255,255))
+            new_image = np_image.transpose(1,2,0)
+            final = new_image[:,:,0]
+            return final
+
+        data_half = data[:half]
+        data_full = data[half:]
+        
+        num_half = which_digit[:half]
+        num_full = which_digit[half:]
+        
+        add_pic = 1 -Image_Tensor(Image.open('plus.jpg'))
+        sub_pic = 1- Image_Tensor(Image.open('minus.jpg'))
+        mul_pic = 1- Image_Tensor(Image.open('multiply.jpg'))
+    
+        add_list=[np.add,add_pic]
+        sub_list=[np.subtract,sub_pic]
+        min_list=[np.multiply,mul_pic] 
+        
+        operations_list=[add_list,sub_list,min_list]
+            
+        def index_opperation():
+            key = np.random.randint(3)
+            return key
+        
+        num1 = num_half.numpy()
+        num2 = num_full.numpy()
+        
+        data_half = skimage.transform.resize(data_half.numpy(), (64,255,255))
+        data_full = skimage.transform.resize(data_full.numpy(), (64,255,255))
+        
+        total_opp = np.zeros(64)
+        total_pic = np.zeros((64,255*3,255))
+        
+        for i in range (64):     
+            value = index_opperation()
+            total_opp[i] = operations_list[value][0](num1[i],num2[i])
+            total_pic[i] = np.concatenate((data_half[i],operations_list[value][1],data_full[i]))
+        
+        pts = total_pic.shape
+        self.npts = pts[1] * pts[2]
+        
+        inp = self.move_to_torch(total_pic)
+        target = self.move_to_torch(total_opp)
+    
+            
+        return inp.view(-1,self.npts), target.reshape(-1,1)
+    
+    
+class MNST_opp(Problem): #using handwritten digits and artimatic symbol to perform
+    #opperation 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+   
+        
+
+    def get_input_and_target(self):
+        nbatch = self.nbatch
+        npts = self.npts
+        
+        MNST_batch = 128
+        half = MNST_batch//2
+#        print(half)
+        img_sz = 28
+        
+        kwargs = {'num_workers': 1, 'pin_memory': True}
+        
+        train_loader = torch.utils.data.DataLoader(
+                datasets.MNIST('../data', train=True, download=True,
+                               transform=transforms.ToTensor()),
+                               batch_size=MNST_batch, shuffle=True, **kwargs)
+
+        pil2tensor = transforms.ToTensor() #code to change image to a tensor
+        tensor2pil = transforms.ToPILImage()
+        
+        for batch_idx, (data, which_digit) in enumerate(train_loader):
+            break
+        
+        data_half = data[:half,:,:,:].squeeze() #splits the data in half
+        data_full = data[half:,:,:,:].squeeze()
+        
+        num_half = which_digit[:half] #split to target numbers in half
+        num_full = which_digit[half:]
+        
+        def Image_Tensor(image): #changes images to tensors
+            rgb_image = pil2tensor(image)
+            np_image = skimage.transform.resize(rgb_image.numpy(), (3,img_sz,img_sz))
+            new_image = np_image.transpose(1,2,0)
+            final = new_image[:,:,0]
+            return final
+        
+        def perform_operation(num_half,num_full): #performs mathimatical operations to 
+            #the numbers with the first half of data with the second half and combine 
+            #the results into on tensor
+            add_opp = torch.add(num_half,num_full)
+            sub_opp = torch.sub(num_half,num_full)
+            mul_opp = torch.mul(num_half,num_full)
+        #    div_opp = torch.div(num_half,num_full)
+            all_opp = torch.cat((add_opp,sub_opp,mul_opp))
+            return all_opp
+        
+        def concate_number(data_half,data_full,add_pic,sub_pic,mul_pic): #concatenate hand
+            #written digits with mathimatical symbols that is being operated on
+            half_num = skimage.transform.resize(data_half.numpy(), (half,img_sz,img_sz))
+            full_num = skimage.transform.resize(data_full.numpy(), (half,img_sz,img_sz))
+    
+            add_eq = np.zeros((half,img_sz*3,img_sz))
+            sub_eq = np.zeros((half,img_sz*3,img_sz))
+            mul_eq = np.zeros((half,img_sz*3,img_sz))
+            for i in range(half):
+                add_eq[i] = np.concatenate((half_num[i],add_pic,full_num[i])) 
+                sub_eq[i] = np.concatenate((half_num[i],sub_pic,full_num[i])) 
+                mul_eq[i] = np.concatenate((half_num[i],mul_pic,full_num[i])) 
+            full_image = np.concatenate((add_eq,sub_eq,mul_eq))
+            return full_image
+    
+    
+        add_pic = 1 - Image_Tensor(Image.open('plus.jpg')) #creates additions symbol
+        sub_pic = 1 - Image_Tensor(Image.open('minus.jpg')) #creates subtractions symbol
+        mul_pic = 1 - Image_Tensor(Image.open('multiply.jpg')) #creates multiplication symbol
+        
+    
+        input_results = concate_number(data_half,data_full,add_pic,sub_pic,mul_pic)
+        target_results = perform_operation(num_half,num_full)
+        
+        self.npts = input_results.shape[1] * input_results.shape[2]
+        self.nbatch = input_results.shape[0]
+        
+        input_pic = torch.from_numpy(input_results)
+        input_pic = input_pic.view(-1,self.npts)
+            
+        return input_pic.to(torch.float32),target_results.reshape(-1,1).to(torch.float32)   
     
 class MNST(Problem): # implenenting the MNST problem
     def __init__(self, **kwargs):
@@ -52,13 +216,15 @@ class MNST(Problem): # implenenting the MNST problem
     def get_input_and_target(self):
         nbatch = self.nbatch
         npts = self.npts
+#        
+
         
         kwargs = {'num_workers': 1, 'pin_memory': True}
         
         train_loader = torch.utils.data.DataLoader(
                 datasets.MNIST('../data', train=True, download=True,
                                transform=transforms.ToTensor()),
-                               batch_size=nbatch, shuffle=True, **kwargs)
+                               batch_size= nbatch, shuffle=True, **kwargs)
 
         for batch_idx, (data, which_digit) in enumerate(train_loader):
             xs = data.size()
