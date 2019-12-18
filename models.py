@@ -364,19 +364,21 @@ class TrainerRNN(nn.Module):
         self.rnn = nn.GRU(self.input_size, self.hidden_dim, self.n_layers)
         self.fc = nn.Linear(self.hidden_dim, self.output_size)
 
+        self.forward_count = 0
+        
     def forward(self, x):
         
         batch_size = 1
-        x = x.unsqueeze(1)
 
         # Initializing hidden state for first input using method defined below
         hidden = self.init_hidden(batch_size)
 
         # Passing in the input and hidden state into the model and obtaining outputs
-        out, hidden = self.rnn(x, hidden)
+        out, hidden = self.rnn(x.unsqueeze(1), hidden)
         
         # Reshaping the outputs such that it can be fit into the fully connected layer
         out = out.contiguous().view(-1, self.hidden_dim)
+#        out = out.view(-1, self.hidden_dim)
         out = self.fc(out)
         
         return out
