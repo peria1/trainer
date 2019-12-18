@@ -49,7 +49,107 @@ class Problem():
         print('You must define your data generator.')
         return None
     
-class MNST_solver(Problem): # implenenting the MNST problem
+    def MNST_data(self):
+        MNST_batch = 128
+        half = MNST_batch//2
+         
+        kwargs = {'num_workers': 1, 'pin_memory': True}
+        train_loader = torch.utils.data.DataLoader(
+                    datasets.MNIST('../data', train=True, download=True,
+                                   transform=transforms.ToTensor()),
+                                   batch_size=MNST_batch, shuffle=True, **kwargs)
+        for batch_idx, (data, which_digit) in enumerate(train_loader):
+                break
+        data_half = data[:half,:,:,:].squeeze().numpy()
+        data_full = data[half:,:,:,:].squeeze().numpy()
+        num_half = which_digit[:half].numpy()
+        num_full = which_digit[half:].numpy()
+        return (data_half,data_full,num_half,num_full,data,which_digit)
+    def PIL_to_Numpy (self):
+        
+        img_size = 28
+        
+        pil2tensor = transforms.ToTensor()
+        
+        def Image_numpy(image):
+            rgb_image = pil2tensor(image)
+            np_image = skimage.transform.resize(rgb_image.numpy(), (3,img_size,img_size))
+            new_image = np_image.transpose(1,2,0)
+            final = new_image[:,:,0]
+            return final
+        
+        add_pic = 1 - Image_numpy(Image.open('plus.jpg')) #creates additions symbol
+        sub_pic = 1 - Image_numpy(Image.open('minus.jpg')) #creates subtractions symbol
+        mul_pic = 1 - Image_numpy(Image.open('multiply.jpg')) #creates multiplication symbol
+        
+        return(add_pic,sub_pic,mul_pic)
+        
+    
+    
+class MNST_to_MNST(Problem): #takes MNST data as the input and target
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+    
+    def get_input_and_target(self):
+        data_half,data_full,num_half,num_full,data,which_digit = self.MNST_data()
+        
+        xs = data.size()
+        self.npts = xs[2] * xs[3]
+        
+        return data.squeeze().view(-1,self.npts),data.squeeze().view(-1,self.npts)
+    
+class MNST_eq_solver(Problem): # uses one mathimatical operation to solve MNST data
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+   
+
+    def get_input_and_target(self):
+        nbatch = self.nbatch
+#        npts = self.npts
+#
+        half = nbatch//2
+        
+        img_size = 28
+        
+        top_image = np.zeros((half,img_size,img_size*2)) 
+        bot_image = np.zeros((half,img_size,img_size*2))
+        total_image = np.zeros((half,img_size*2 + 4,img_size*2))
+        empty_box = np.zeros((img_size,img_size))
+        equal = np.ones((4,img_size*2))
+        total_eq = np.zeros((half,img_size*2,img_size*2))
+         
+        
+        data_half,data_full,num_half,num_full,data,which_digit = self.MNST_data()
+        add_pic,sub_pic,mul_pic = self.PIL_to_Numpy()
+        
+        add_list=[np.add,add_pic]
+        sub_list=[np.subtract,sub_pic]
+        min_list=[np.multiply,mul_pic] 
+        
+        op_list=[add_list,sub_list,min_list] #reference list for indexing mathimatial operation
+
+        
+        val = np.random.randint(3) #return a random number to use to index mathimatical
+        #operation list
+        
+        
+        for i in range (half): #this loops creates a image display of the equations
+            top_image[i] = np.concatenate((empty_box,data_half[i]),axis=1)
+            bot_image[i] = np.concatenate((op_list[val][1],data_full[i]),axis=1)
+            total_eq[i] = np.concatenate((top_image[i],bot_image[i]))
+            total_image[i] = np.concatenate((total_eq[i],equal))
+            
+        self.npts = total_image.shape[1] * total_image.shape[2]
+        self.nbatch = total_image.shape[0]
+        
+        results = op_list[val][0](num_half,num_full) #this index performs the 
+        #randomly choose mathimatical operation
+        inp , target = self.move_to_torch(total_image,results)
+        
+        return inp.view(-1,self.npts) , target.reshape(-1,1)
+
+class MNST_multi_solver(Problem): # this MNST problem continuously selects random
+    #mathimatical operation and solves a multiple equations for the select data
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
    
@@ -58,36 +158,10 @@ class MNST_solver(Problem): # implenenting the MNST problem
     def get_input_and_target(self):
         nbatch = self.nbatch
 #        npts = self.npts
-#
-        half = nbatch
-
+        img_size = 28
         
-        kwargs = {'num_workers': 1, 'pin_memory': True}
-        
-        train_loader = torch.utils.data.DataLoader(
-                datasets.MNIST('../data', train=True, download=True,
-                               transform=transforms.ToTensor()),
-                               batch_size= nbatch*2, shuffle=True, **kwargs)
-
-        for batch_idx, (data, which_digit) in enumerate(train_loader):
-            break
-        
-        def Image_Tensor(image):
-            rgb_image = pil2tensor(image)
-            np_image = skimage.transform.resize(rgb_image.numpy(), (3,255,255))
-            new_image = np_image.transpose(1,2,0)
-            final = new_image[:,:,0]
-            return final
-
-        data_half = data[:half]
-        data_full = data[half:]
-        
-        num_half = which_digit[:half]
-        num_full = which_digit[half:]
-        
-        add_pic = 1 -Image_Tensor(Image.open('plus.jpg'))
-        sub_pic = 1- Image_Tensor(Image.open('minus.jpg'))
-        mul_pic = 1- Image_Tensor(Image.open('multiply.jpg'))
+        data_half,data_full,num_half,num_full,data,which_digit = self.MNST_data()
+        add_pic,sub_pic,mul_pic = self.PIL_to_Numpy()
     
         add_list=[np.add,add_pic]
         sub_list=[np.subtract,sub_pic]
@@ -95,106 +169,71 @@ class MNST_solver(Problem): # implenenting the MNST problem
         
         operations_list=[add_list,sub_list,min_list]
             
-        def index_opperation():
+        def index_opperation(): #reference list for indexing mathimatical operation
             key = np.random.randint(3)
             return key
         
-        num1 = num_half.numpy()
-        num2 = num_full.numpy()
+    
+        total_opp = np.zeros(nbatch//2)
+        total_pic = np.zeros((nbatch//2,img_size*3,img_size))
         
-        data_half = skimage.transform.resize(data_half.numpy(), (64,255,255))
-        data_full = skimage.transform.resize(data_full.numpy(), (64,255,255))
-        
-        total_opp = np.zeros(64)
-        total_pic = np.zeros((64,255*3,255))
-        
-        for i in range (64):     
-            value = index_opperation()
-            total_opp[i] = operations_list[value][0](num1[i],num2[i])
+        for i in range (nbatch//2):  #creates a image display and mathimatical opp. for  equations   
+            value = index_opperation() #reinteration of a new operation per data set
+            total_opp[i] = operations_list[value][0](num_half[i],num_full[i])
             total_pic[i] = np.concatenate((data_half[i],operations_list[value][1],data_full[i]))
         
         pts = total_pic.shape
         self.npts = pts[1] * pts[2]
         
-        inp = self.move_to_torch(total_pic)
-        target = self.move_to_torch(total_opp)
+        inp = torch.from_numpy(total_pic)
+        target = torch.from_numpy(total_opp)
     
             
-        return inp.view(-1,self.npts), target.reshape(-1,1)
+        return inp.view(-1,self.npts).to(torch.float32), target.reshape(-1,1).to(torch.float32)
     
     
-class MNST_opp(Problem): #using handwritten digits and artimatic symbol to perform
-    #opperation 
+class MNST_all_solver(Problem): #using handwritten digits and artimatic symbol to perform
+    # all opperations on all of the data set 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
    
         
 
     def get_input_and_target(self):
-        nbatch = self.nbatch
-        npts = self.npts
+#        nbatch = self.nbatch
+#        npts = self.npts
         
         MNST_batch = 128
         half = MNST_batch//2
 #        print(half)
         img_sz = 28
         
-        kwargs = {'num_workers': 1, 'pin_memory': True}
-        
-        train_loader = torch.utils.data.DataLoader(
-                datasets.MNIST('../data', train=True, download=True,
-                               transform=transforms.ToTensor()),
-                               batch_size=MNST_batch, shuffle=True, **kwargs)
-
-        pil2tensor = transforms.ToTensor() #code to change image to a tensor
-        tensor2pil = transforms.ToPILImage()
-        
-        for batch_idx, (data, which_digit) in enumerate(train_loader):
-            break
-        
-        data_half = data[:half,:,:,:].squeeze() #splits the data in half
-        data_full = data[half:,:,:,:].squeeze()
-        
-        num_half = which_digit[:half] #split to target numbers in half
-        num_full = which_digit[half:]
-        
-        def Image_Tensor(image): #changes images to tensors
-            rgb_image = pil2tensor(image)
-            np_image = skimage.transform.resize(rgb_image.numpy(), (3,img_sz,img_sz))
-            new_image = np_image.transpose(1,2,0)
-            final = new_image[:,:,0]
-            return final
+        data_half,data_full,num_half,num_full,data,which_digit = self.MNST_data()
+        add_pic,sub_pic,mul_pic = self.PIL_to_Numpy()
         
         def perform_operation(num_half,num_full): #performs mathimatical operations to 
             #the numbers with the first half of data with the second half and combine 
             #the results into on tensor
-            add_opp = torch.add(num_half,num_full)
-            sub_opp = torch.sub(num_half,num_full)
-            mul_opp = torch.mul(num_half,num_full)
+            add_opp = np.add(num_half,num_full)
+            sub_opp = np.subtract(num_half,num_full)
+            mul_opp = np.multiply(num_half,num_full)
         #    div_opp = torch.div(num_half,num_full)
-            all_opp = torch.cat((add_opp,sub_opp,mul_opp))
+            all_opp = np.concatenate((add_opp,sub_opp,mul_opp))
             return all_opp
         
         def concate_number(data_half,data_full,add_pic,sub_pic,mul_pic): #concatenate hand
             #written digits with mathimatical symbols that is being operated on
-            half_num = skimage.transform.resize(data_half.numpy(), (half,img_sz,img_sz))
-            full_num = skimage.transform.resize(data_full.numpy(), (half,img_sz,img_sz))
-    
+
             add_eq = np.zeros((half,img_sz*3,img_sz))
             sub_eq = np.zeros((half,img_sz*3,img_sz))
             mul_eq = np.zeros((half,img_sz*3,img_sz))
             for i in range(half):
-                add_eq[i] = np.concatenate((half_num[i],add_pic,full_num[i])) 
-                sub_eq[i] = np.concatenate((half_num[i],sub_pic,full_num[i])) 
-                mul_eq[i] = np.concatenate((half_num[i],mul_pic,full_num[i])) 
+                add_eq[i] = np.concatenate((data_half[i],add_pic,data_full[i])) 
+                sub_eq[i] = np.concatenate((data_half[i],sub_pic,data_full[i])) 
+                mul_eq[i] = np.concatenate((data_half[i],mul_pic,data_full[i])) 
             full_image = np.concatenate((add_eq,sub_eq,mul_eq))
             return full_image
     
-    
-        add_pic = 1 - Image_Tensor(Image.open('plus.jpg')) #creates additions symbol
-        sub_pic = 1 - Image_Tensor(Image.open('minus.jpg')) #creates subtractions symbol
-        mul_pic = 1 - Image_Tensor(Image.open('multiply.jpg')) #creates multiplication symbol
-        
     
         input_results = concate_number(data_half,data_full,add_pic,sub_pic,mul_pic)
         target_results = perform_operation(num_half,num_full)
@@ -202,12 +241,14 @@ class MNST_opp(Problem): #using handwritten digits and artimatic symbol to perfo
         self.npts = input_results.shape[1] * input_results.shape[2]
         self.nbatch = input_results.shape[0]
         
-        input_pic = torch.from_numpy(input_results)
-        input_pic = input_pic.view(-1,self.npts)
+        input,target = self.move_to_torch(input_results,target_results.reshape(-1,1))
+        
+        input_pic = input.view(-1,self.npts)
             
-        return input_pic.to(torch.float32),target_results.reshape(-1,1).to(torch.float32)   
+        return input_pic,target   
     
-class MNST(Problem): # implenenting the MNST problem
+class MNST(Problem): # implenenting the MNST problem where the input of handwritten 
+    #digits are train to connected hand written digits with numbers
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
    
@@ -215,74 +256,18 @@ class MNST(Problem): # implenenting the MNST problem
 
     def get_input_and_target(self):
         nbatch = self.nbatch
-        npts = self.npts
-#        
-
         
-        kwargs = {'num_workers': 1, 'pin_memory': True}
+        data_half,data_full,num_half,num_full,data,which_digit = self.MNST_data()
         
-        train_loader = torch.utils.data.DataLoader(
-                datasets.MNIST('../data', train=True, download=True,
-                               transform=transforms.ToTensor()),
-                               batch_size= nbatch, shuffle=True, **kwargs)
+        xs = data.size()
+        
+        self.npts = xs[2] * xs [3]
+        data = data.view(-1,self.npts)
+            
+        return data.to(torch.float32),which_digit(nbatch,1).to(torch.float32)
 
-        for batch_idx, (data, which_digit) in enumerate(train_loader):
-            xs = data.size()
-            self.npts = xs[2] * xs [3]
-            data = data.view(-1,self.npts)
-            which_digit = which_digit.reshape(nbatch,1).to(torch.float32)
-            break
-            
-            
-        return data,which_digit
     
-class MNST_sum(Problem): # target the input squared
-                        #   But see below!
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-   
-        
 
-    def get_input_and_target(self):
-        nbatch = self.nbatch
-        npts = self.npts
-        
-        half = nbatch
-        MNST_batchsize = nbatch *2 #using half pairs
-        
-        sum_digits = torch.zeros(half)
-        
-        kwargs = {'num_workers': 1, 'pin_memory': True}
-        
-        train_loader = torch.utils.data.DataLoader(
-                datasets.MNIST('../data', train=True, download=True,
-                               transform=transforms.ToTensor()),
-                               batch_size=MNST_batchsize, shuffle=True, **kwargs)
-        def sum_of_digits(x0,x1):
-            for i in range (half):
-                sum_digits[i] = x0[i] + x1[i]
-            return sum_digits
-        
-        for batch_idx, (data, which_digit) in enumerate(train_loader):
-            datax0 = data[:half,:,:,:]
-            datax1 = data[half:,:,:,:]
-            
-            which_digitx0=which_digit[:half]
-            which_digitx1=which_digit[half:]
-#            print(data.size())
-#            print(datax0.size())
-#            print(datax1.size())
-            digit_total = sum_of_digits(which_digitx0,which_digitx1)
-            x0_to_x1 = torch.cat((datax0.squeeze(),datax1.squeeze()),1)
-            
-            xs = x0_to_x1.size()
-            self.npts = xs[1] * xs[2]
-            
-            x0_to_x1 = x0_to_x1.view(-1,self.npts)
-            break
-            
-            
-        return x0_to_x1,digit_total.reshape((nbatch,1))
 
 class circumference(Problem): # takes input radius and finds circumference of circle
     def __init__(self, **kwargs):

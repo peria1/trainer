@@ -290,8 +290,13 @@ class n_double_one_tanh(nn.Module):    # moved to n_double_one_tanh
 
 
 class vectorVAE(nn.Module):   # moved to vectorVAE
-    def __init__(self,dim=2,npts=50, nbatch=128):  # this sets up 5 linear layers
-        super(vectorVAE, self).__init__()
+    def __init__(self, dim=2, npts=None, nbatch=None,nout=None):  # trying to see if machine can tell that y is the sum over x 
+        super().__init__()
+        
+        if npts is None:
+            npts = 50
+        if nbatch is None:
+            nbatch = 128
 
         self.npts = npts
         self.nbatch = nbatch        
