@@ -28,7 +28,7 @@ def residual_plot(viewer,d):
     xlim = d.ax.get_xlim()
     d.ax.hlines(0, xlim[0], xlim[1])
     
-def weight_plot(viewer, d):
+def weight_plot(viewer, d, gram = False):
     if d.first:
         import matplotlib.pyplot as plt
         from matplotlib.widgets import RadioButtons
@@ -69,16 +69,22 @@ def weight_plot(viewer, d):
 #        d.radio.labels[i].set_text(d.layer_names[i]+':'+str(mu)+':'+str(std))
         
     im = d.plist[d.layer_to_show][1].cpu().detach().numpy()
-#    print(d.np.sum(d.np.abs(im)))
-    
+    if gram:
+        im = build_gram_display(im)
+        
     d.ax.set_axis_off()
     d.mappable = d.ax.imshow(im)
-    d.ax.set_title(d.layer_names[d.layer_to_show])
+    title = d.layer_names[d.layer_to_show]
+    if gram:
+        title += ' Gram matrix'
+    d.ax.set_title(title)
     d.cbar_axis.clear()
     d.plt.colorbar(mappable=d.mappable, cax=d.cbar_axis)
     d.fig.canvas.draw()
     d.fig.canvas.flush_events()
-    
+
+def gram_weights(viewer,d):
+    weight_plot(viewer, d, gram=True)    
 #def numbers_check(viewer, d):
 #    if d.first:
 #        import matplotlib.pyplot as plt
@@ -97,13 +103,15 @@ def weight_plot(viewer, d):
 #        d.weight_names = [n for n,p in d.plist]
 #        
 #    
-def dataflow_plot(viewer, d):
+def dataflow_plot(viewer, d, gram = False):
     if d.first:
         import matplotlib.pyplot as plt
         from matplotlib.widgets import RadioButtons
         import torch
-        d.torch = torch
+        import numpy as np
 
+        d.torch = torch
+        d.np = np
         plt.figure(d.fig.number);
         plt.subplots_adjust(left=0.4)
 
@@ -139,26 +147,41 @@ def dataflow_plot(viewer, d):
 
         def capture_data_hook(self, input, output):
             d.current_data = output.cpu().detach().numpy()
+            if gram:
+                d.current_data = build_gram_display(d.current_data)
         d.hook = capture_data_hook
             
     mp = d.modules[d.layer_to_show]
     chandle = mp.register_forward_hook(d.hook)
     viewer.trainer.model(d.x)
     chandle.remove()
-    
-#    if not FEATURE_MAPS:
-#        print('FEATURE_MAPS not set in capture_data_hook.')
-        
+            
     d.ax.imshow(d.current_data)
     d.ax.set_title(d.layer_names[d.layer_to_show])
     d.ax.set_axis_off()
     d.mappable = d.ax.imshow(d.current_data)
-    d.ax.set_title(d.layer_names[d.layer_to_show]+ ' output data')
+    title = ' output data'
+    if gram:
+        title += ' Gram matrix'
+    d.ax.set_title(d.layer_names[d.layer_to_show]+ title)
     d.cbar_axis.clear()
     d.plt.colorbar(mappable=d.mappable, cax=d.cbar_axis)
     d.fig.canvas.draw()
     d.fig.canvas.flush_events()
    
+def datagram(viewer, d):
+    dataflow_plot(viewer, d, gram = True)
+
+def build_gram_display(dat):
+    import numpy as np
+    dat = np.abs(np.matmul(np.transpose(dat), dat))
+    diag2remove = np.diagonal(dat) + np.mean(dat)
+    dat = np.abs(dat-np.diag(diag2remove))
+    dat = np.log10(dat)
+    return dat
+ 
+
+
 def example_plot(viewer, d):
     if d.first:
         import numpy as np
