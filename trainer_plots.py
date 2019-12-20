@@ -175,7 +175,7 @@ def datagram(viewer, d):
 def build_gram_display(dat):
     import numpy as np
     dat = np.abs(np.matmul(np.transpose(dat), dat))
-    diag2remove = np.diagonal(dat) + np.mean(dat)
+    diag2remove = np.diagonal(dat) - np.mean(dat)
     dat = np.abs(dat-np.diag(diag2remove))
     dat = np.log10(dat)
     return dat
