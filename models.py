@@ -353,6 +353,9 @@ class TrainerRNN(nn.Module):
             nbatch = 128
         if nout is None:
             nout = npts
+            
+        self.npts = npts
+        self.nbatch = nbatch      
         
         self.input_size = npts
         self.seq_len = nbatch
