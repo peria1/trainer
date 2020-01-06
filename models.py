@@ -17,6 +17,7 @@ Created on Sun Oct  6 07:32:17 2019
 import torch
 import torch.utils.data
 from torch import nn
+from torchvision.models.vgg import VGG
 
 class one_linear_layer(nn.Module):
     def __init__(self, npts=None, nbatch=None, nout=None):
@@ -393,7 +394,52 @@ class TrainerRNN(nn.Module):
         hidden = hidden.to(self.device)
         return hidden
          
-        #--------------------
+#--------------------
+#            vgg_model = VGGNet(pretrained = pretrained, requires_grad=True,GPU = GPU)
+
+ 
+class VGGNet(VGG):
+    def __init__(self, in_channels, num_classes = None, model='vgg16', requires_grad=True, \
+                 show_params=False, GPU = False):
+        from VGGdefs import ranges, cfg, make_layers
+        if not in_channels:
+            in_channels=3
+        
+        if not num_classes:
+            num_classes = 1000
+    
+        super().__init__(make_layers(cfg[model],in_channels),\
+              num_classes=num_classes)
+        self.ranges = ranges[model]
+
+        if not requires_grad:
+            for param in super().parameters():
+                param.requires_grad = False
+
+        if show_params:
+            for name, param in self.named_parameters():
+                print(name, param.device)
+        if GPU:
+            for name, param in self.named_parameters():
+                param.cuda()
+                
+ 
+
+    def forward(self, x):
+        output = {}
+
+        # get the output of each maxpooling layer (5 maxpool in VGG net)
+        for idx in range(len(self.ranges)):
+            for layer in range(self.ranges[idx][0], self.ranges[idx][1]):
+                x = self.features[layer](x)
+            output["x%d"%(idx+1)] = x
+        
+        score = self.classifier(torch.flatten(self.avgpool(output['x5']),1))
+
+        return torch.sigmoid(score)
+
+
+
 
 class RNN(nn.Module):
     def __init__(self, input_size, output_size, hidden_dim, n_layers):

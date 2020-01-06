@@ -26,13 +26,14 @@ def fire_and_forget(f):
 
     return wrapped
 
-
 class trainer_view():
     def __init__(self, *args, **kwargs):
         #
         # Controller window
         #
-        self.fig, self.ax = plt.subplots(1,1)       
+        reg_width = 6.4
+        reg_height = 4.8
+        self.fig, self.ax = plt.subplots(1,1, figsize=(reg_width*1.33,reg_height))       
         self.fig.canvas.mpl_disconnect(self.fig.canvas.manager.key_press_handler_id)       
         self.fig.canvas.mpl_connect('key_press_event', self.process_key) 
         self.fig.canvas.mpl_connect('button_press_event', self.process_button) 
@@ -64,7 +65,11 @@ class trainer_view():
                          self.Training_Display(name='dataflow',  \
                                                update=tp.dataflow_plot),\
                          self.Training_Display(name='singular values', \
-                                               update=tp.svd_weight_plot)]
+                                               update=tp.svd_weight_plot),\
+                         self.Training_Display(name='Gram of data',\
+                                               update=tp.datagram),\
+                         self.Training_Display(name='Gram of weights',\
+                                               update=tp.gram_weights)]
 #                         self.Training_Display(name='magnitudes',\
 #                                               update=tp.numbers_check)]
                          
@@ -74,19 +79,23 @@ class trainer_view():
                                                update=tp.example_plot))
 
 #        # Button layout, for a column at the right-hand side of window. 
-        text_box_left_edge = 0.75
-        text_box_width = 0.15
-        left_edge = 0.6
-        width = 0.3
+        text_box_left_edge = 0.85
+        text_box_width = 0.075
+        left_edge = 0.75
+        width = 0.175
+        middle_edge = 0.5 - width/2.0
         height = 0.075
         text_color = 'white'
         down_from_top = [0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2,0.1]
         
-        plt.figure(self.fig.number)
+#        reg_width = 6.4
+#        reg_height = 4.8
+#        plt.figure(self.fig.number,figsize=(reg_width*1.33,reg_height))
         
         display_pick_ax = plt.axes([0.15, 0.125, width, 0.75])
         disp_names = [d.name for d in self.displays]
         actives = [d.active for d in self.displays]
+        
         
         self.dispradio = CheckButtons(display_pick_ax,  disp_names, actives)
         def toggle_active_display(event):
@@ -98,6 +107,10 @@ class trainer_view():
                         self.displays[i].activate()
 #                    self.displays[i].active = not self.displays[i].active
         self.dispradio.on_clicked(toggle_active_display)
+
+        trainer_control_ax = plt.axes([middle_edge, 0.125, width, 0.75])
+#        self.criteria_button = Button()
+
 
     
         ax_loss_box = plt.axes([text_box_left_edge, down_from_top[0], text_box_width, height]) # left, bottom, width, height
