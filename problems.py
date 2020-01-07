@@ -115,10 +115,10 @@ class MNST_eq_solver(Problem): # uses one mathimatical operation to solve MNST d
    
 
     def get_input_and_target(self):
-        nbatch = self.nbatch
+#        nbatch = self.nbatch
 #        npts = self.npts
 #
-        half = nbatch//2
+        half = 64
         
         img_size = 28
         
@@ -153,7 +153,7 @@ class MNST_eq_solver(Problem): # uses one mathimatical operation to solve MNST d
             
         self.npts = total_image.shape[1] * total_image.shape[2]
         self.nbatch = total_image.shape[0]
-        
+#        print(total_image.shape)
         results = op_list[val][0](num_half,num_full) #this index performs the 
         #randomly choose mathematical operation
         inp , target = self.move_to_torch(total_image,results)
