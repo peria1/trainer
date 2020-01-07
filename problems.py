@@ -61,7 +61,7 @@ class Problem():
         return train_loader
 
 
-    def MNST_data(self):
+    def MNST_data_stack(self):
         MNST_batch = 128
         half = MNST_batch//2
          
@@ -74,6 +74,23 @@ class Problem():
             break
         data_half = data[:half,:,:,:].squeeze().numpy()
         data_full = data[half:,:,:,:].squeeze().numpy()
+        num_half = which_digit[:half].numpy()
+        num_full = which_digit[half:].numpy()
+        return (data_half,data_full,num_half,num_full,data,which_digit)
+
+    def MNST_data(self):
+        MNST_batch = 128
+        half = MNST_batch//2
+         
+        kwargs = {'num_workers': 1, 'pin_memory': True}
+        train_loader = torch.utils.data.DataLoader(
+                    datasets.MNIST('../data', train=True, download=True,
+                                   transform=transforms.ToTensor()),
+                                   batch_size=MNST_batch, shuffle=True, **kwargs)
+        for batch_idx, (data, which_digit) in enumerate(train_loader):
+            break
+        data_half = data[:half,:,:,:].numpy()
+        data_full = data[half:,:,:,:].numpy()
         num_half = which_digit[:half].numpy()
         num_full = which_digit[half:].numpy()
         return (data_half,data_full,num_half,num_full,data,which_digit)
@@ -201,7 +218,8 @@ class MNST_multi_solver(Problem): # this MNST problem continuously selects rando
         self.nbatch = nbatch//2
             
 #        return inp.view(-1,self.npts).to(torch.float32), target.reshape(-1,1).to(torch.float32)
-        return inp.reshape(64,1,84,28).to(torch.float32), target.reshape(-1,1).to(torch.float32)    
+#        return inp.reshape(128,1,84,28).to(torch.float32), target.reshape(-1,1).to(torch.float32)    
+        return inp.to(torch.float32), target.to(torch.float32)
     
 class MNST_all_solver(Problem): #using handwritten digits and artimatic symbol to perform
     # all opperations on all of the data set 
