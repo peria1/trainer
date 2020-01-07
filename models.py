@@ -20,30 +20,29 @@ from torch import nn
 from torchvision.models.vgg import VGG
 
 class one_linear_layer(nn.Module):
-    def __init__(self, npts=None, nbatch=None, nout=None):
+    def __init__(self, problem):
         super().__init__()
 
-        if npts is None:
-            self.npts = 50
-        if nbatch is None:
-            self.nbatch = 128
-    
+        inp, target = problem.get_input_and_target()
+
+        assert(len(inp.size())==2)
+        nbatch, npts = inp.size()
+        
         self.npts = npts
         self.nbatch = nbatch    
-        
-        self.L1 = nn.Linear(self.npts,1)
+       
+        self.L1 = nn.Linear(self.npts,target.size()[1])
        
     def forward(self,x):
         return self.L1(x)
 
 class one_linear_layer_to_n(nn.Module):
-    def __init__(self, npts=None, nbatch=None, nout=None):
+    def __init__(self, problem):
         super().__init__()
 
-        if npts is None:
-            self.npts = 50
-        if nbatch is None:
-            self.nbatch = 128
+        inp, target = problem.get_input_and_target()
+        assert(len(inp.size())==2)
+        nbatch, npts = inp.size()
         
         self.L1 = nn.Linear(self.npts,self.npts)
        
@@ -52,17 +51,15 @@ class one_linear_layer_to_n(nn.Module):
 
      
 class bisect_to_power_of_two(nn.Module):
-    def __init__(self, npts=None, nbatch=None,nout=None):  # trying to see if machine can tell that y is the sum over x 
+    def __init__(self, problem):   
         super().__init__()
 
-        if npts is None:
-            npts = 64
-        if nbatch is None:
-            nbatch = 128
-        if nout is None:
-            nout = 1
-        
+        inp, target = problem.get_input_and_target()
+        assert(len(inp.size())==2)
+        nbatch, npts = inp.size()
+        nout = target.size()[1]
         nchk = npts*nout
+        
         try:
             assert((nchk != 0) and (nchk & (nchk-1) == 0))
         except AssertionError:
@@ -88,14 +85,13 @@ class bisect_to_power_of_two(nn.Module):
 
 
 class n_double_n_act(nn.Module): # moved to n_double_n
-    def __init__(self, npts=None, nbatch=None, nout=None): 
+    def __init__(self, problem): 
         super().__init__()
 
-        if npts is None:
-            npts = 50
-        if nbatch is None:
-            nbatch = 128
-        
+        inp, target = problem.get_input_and_target()
+        assert(len(inp.size())==2)
+        nbatch, npts = inp.size()
+                
         self.npts = npts
         self.nbatch = nbatch
         
@@ -126,13 +122,12 @@ class n_double_n_act(nn.Module): # moved to n_double_n
 
 
 class n_double_n(nn.Module): # moved to n_double_n
-    def __init__(self, npts=None, nbatch=None, nout=None): 
+    def __init__(self, problem): 
         super().__init__()
 
-        if npts is None:
-            npts = 50
-        if nbatch is None:
-            nbatch = 128
+        inp, target = problem.get_input_and_target()
+        assert(len(inp.size())==2)
+        nbatch, npts = inp.size()
         
         self.npts = npts
         self.nbatch = nbatch
@@ -161,15 +156,14 @@ class n_double_n(nn.Module): # moved to n_double_n
         return dataflow
 
 class n_double_one(nn.Module):  # moved to n_double_one
-    def __init__(self, npts=None, nbatch=None, nout=None):  # trying to see if machine can tell that y is the sum over x 
+    def __init__(self, problem):  # trying to see if machine can tell that y is the sum over x 
         super().__init__()
 
         self.custom_loss = nn.L1Loss()
         
-        if npts is None:
-            npts = 50
-        if nbatch is None:
-            nbatch = 128
+        inp, target = problem.get_input_and_target()
+        assert(len(inp.size())==2)
+        nbatch, npts = inp.size()
         
         self.npts = npts
         self.nbatch = nbatch
@@ -205,18 +199,16 @@ class n_double_one(nn.Module):  # moved to n_double_one
 
 
 class n_double_nout(nn.Module):  # moved to n_double_one
-    def __init__(self, npts=None, nbatch=None,nout=None):  # trying to see if machine can tell that y is the sum over x 
+    def __init__(self, problem):  # trying to see if machine can tell that y is the sum over x 
         super().__init__()
 
 
         self.custom_loss = nn.L1Loss()
         
-        if npts is None:
-            npts = 50
-        if nbatch is None:
-            nbatch = 128
-        if nout is None:
-            nout = npts
+        inp, target = problem.get_input_and_target()
+        assert(len(inp.size())==2)
+        nbatch, npts = inp.size()
+        nout = target.size()[1]
         
         
         self.npts = npts
@@ -253,13 +245,12 @@ class n_double_nout(nn.Module):  # moved to n_double_one
 
 
 class n_double_one_tanh(nn.Module):    # moved to n_double_one_tanh
-    def __init__(self, npts=None, nbatch=None):  # trying to see if machine can tell that y is the sum over x 
-        super(n_double_one_tanh, self).__init__()
+    def __init__(self, problem):  # trying to see if machine can tell that y is the sum over x 
+        super().__init__()
 
-        if npts is None:
-            npts = 50
-        if nbatch is None:
-            nbatch = 128
+        inp, target = problem.get_input_and_target()
+        assert(len(inp.size())==2)
+        nbatch, npts = inp.size()
         
         self.npts = npts
         self.nbatch = nbatch
@@ -291,13 +282,13 @@ class n_double_one_tanh(nn.Module):    # moved to n_double_one_tanh
 
 
 class vectorVAE(nn.Module):   # moved to vectorVAE
-    def __init__(self, dim=2, npts=None, nbatch=None,nout=None):  # trying to see if machine can tell that y is the sum over x 
+    def __init__(self, problem, dim=2):  # trying to see if machine can tell that y is the sum over x 
         super().__init__()
         
-        if npts is None:
-            npts = 50
-        if nbatch is None:
-            nbatch = 128
+        inp, target = problem.get_input_and_target()
+        assert(len(inp.size())==2)
+        nbatch, npts = inp.size()
+        nout = target.size()[1]
 
         self.npts = npts
         self.nbatch = nbatch        
@@ -343,20 +334,15 @@ class vectorVAE(nn.Module):   # moved to vectorVAE
 
 #--------------------
 class TrainerRNN(nn.Module):
-    def __init__(self, npts=None, nbatch=None, nout=None):
+    def __init__(self, problem, npts=None, nbatch=None, nout=None):
         super().__init__()
         
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        if npts is None:
-            npts = 50
-        if nbatch is None:
-            nbatch = 128
-        if nout is None:
-            nout = npts
-            
-        self.npts = npts
-        self.nbatch = nbatch      
+        inp, target = problem.get_input_and_target()
+        assert(len(inp.size())==2)
+        nbatch, npts = inp.size()
+        nout = target.size()[1]
         
         self.input_size = npts
         self.seq_len = nbatch
@@ -399,14 +385,26 @@ class TrainerRNN(nn.Module):
 
  
 class VGGNet(VGG):
-    def __init__(self, in_channels, num_classes = None, model='vgg16', requires_grad=True, \
+    def __init__(self, problem, in_channels=None, num_classes = None, nbatch = None, \
+                 model='vgg16', requires_grad=True, \
                  show_params=False, GPU = False):
         from VGGdefs import ranges, cfg, make_layers
+        import numpy as np
+
+        if not num_classes:
+            num_classes = 1000
+
+        if not nbatch:
+            nbatch = problem.nbatch
+
+        inp, target = problem.get_input_and_target()
+        assert(len(inp.size())==4)
+        nbatch, in_channels, nx, ny = inp.size()
+        assert(np.prod(target.size())==nbatch)
+
         if not in_channels:
             in_channels=3
         
-        if not num_classes:
-            num_classes = 1000
     
         super().__init__(make_layers(cfg[model],in_channels),\
               num_classes=num_classes)
@@ -423,7 +421,12 @@ class VGGNet(VGG):
             for name, param in self.named_parameters():
                 param.cuda()
                 
- 
+        self.custom_loss = self.vggloss
+        self.criterion = torch.nn.CrossEntropyLoss()
+        
+    def vggloss(self,pred,target):
+            
+        return self.criterion(pred, target.to(torch.long))
 
     def forward(self, x):
         output = {}

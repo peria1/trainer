@@ -16,7 +16,7 @@ import skimage
 
 from skimage import transform
 """
-The superclass Problem takes care of things common to all of our "math 
+The superclass Problem takes care of things common to all of our "math
     problem" data sets, like default dimensions and the requirement to 
     define a get_input_and_target method. 
 
@@ -28,6 +28,7 @@ The subclasses here, in their init methods, take care of things like special
 
 
 """
+
 class Problem():
     def __init__(self, npts=None, nbatch=None, nout=None, **kwargs):
         if npts:
@@ -40,15 +41,26 @@ class Problem():
         else:
             self.nbatch = 128
 
-    def move_to_torch(self, input, target):
-        input = torch.from_numpy(input).to(torch.float32)
+    def move_to_torch(self, inp, target):
+        input = torch.from_numpy(inp).to(torch.float32)
         target = torch.from_numpy(target).to(torch.float32)
-        return input, target
+        return inp, target
 
     def get_input_and_target(self):
         print('You must define your data generator.')
         return None
     
+    def MNST_loader(self):
+        MNST_batch = 128
+         
+        kwargs = {'num_workers': 1, 'pin_memory': True}
+        train_loader = torch.utils.data.DataLoader(
+                    datasets.MNIST('../data', train=True, download=True,
+                                   transform=transforms.ToTensor()),
+                                   batch_size=MNST_batch, shuffle=True, **kwargs)
+        return train_loader
+
+
     def MNST_data(self):
         MNST_batch = 128
         half = MNST_batch//2
@@ -59,12 +71,13 @@ class Problem():
                                    transform=transforms.ToTensor()),
                                    batch_size=MNST_batch, shuffle=True, **kwargs)
         for batch_idx, (data, which_digit) in enumerate(train_loader):
-                break
+            break
         data_half = data[:half,:,:,:].squeeze().numpy()
         data_full = data[half:,:,:,:].squeeze().numpy()
         num_half = which_digit[:half].numpy()
         num_full = which_digit[half:].numpy()
         return (data_half,data_full,num_half,num_full,data,which_digit)
+    
     def PIL_to_Numpy (self):
         
         img_size = 28
@@ -83,8 +96,6 @@ class Problem():
         mul_pic = 1 - Image_numpy(Image.open('multiply.jpg')) #creates multiplication symbol
         
         return(add_pic,sub_pic,mul_pic)
-        
-    
     
 class MNST_to_MNST(Problem): #takes MNST data as the input and target
     def __init__(self, **kwargs):
@@ -126,10 +137,11 @@ class MNST_eq_solver(Problem): # uses one mathimatical operation to solve MNST d
         sub_list=[np.subtract,sub_pic]
         min_list=[np.multiply,mul_pic] 
         
-        op_list=[add_list,sub_list,min_list] #reference list for indexing mathimatial operation
+        op_list=[add_list,sub_list,min_list] #reference list for indexing 
+                                             #mathematical operation
 
         
-        val = np.random.randint(3) #return a random number to use to index mathimatical
+        val = np.random.randint(3) #return a random number to use to index mathematical
         #operation list
         
         
@@ -143,13 +155,13 @@ class MNST_eq_solver(Problem): # uses one mathimatical operation to solve MNST d
         self.nbatch = total_image.shape[0]
 #        print(total_image.shape)
         results = op_list[val][0](num_half,num_full) #this index performs the 
-        #randomly choose mathimatical operation
+        #randomly choose mathematical operation
         inp , target = self.move_to_torch(total_image,results)
         
         return inp.view(-1,self.npts) , target.reshape(-1,1)
 
 class MNST_multi_solver(Problem): # this MNST problem continuously selects random
-    #mathimatical operation and solves a multiple equations for the select data
+    #mathematical operation and solves a multiple equations for the select data
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
    
@@ -157,7 +169,6 @@ class MNST_multi_solver(Problem): # this MNST problem continuously selects rando
 
     def get_input_and_target(self):
         nbatch = self.nbatch
-#        npts = self.npts
         img_size = 28
         
         data_half,data_full,num_half,num_full,data,which_digit = self.MNST_data()
@@ -247,12 +258,10 @@ class MNST_all_solver(Problem): #using handwritten digits and artimatic symbol t
             
         return input_pic,target   
     
-class MNST(Problem): # implenenting the MNST problem where the input of handwritten 
+class MNST_stack(Problem): # implenenting the MNST problem where the input of handwritten 
     #digits are train to connected hand written digits with numbers
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-   
-        
 
     def get_input_and_target(self):
         nbatch = self.nbatch
@@ -264,11 +273,36 @@ class MNST(Problem): # implenenting the MNST problem where the input of handwrit
         self.npts = xs[2] * xs [3]
         data = data.view(-1,self.npts)
             
-        return data.to(torch.float32),which_digit(nbatch,1).to(torch.float32)
+        return data.to(torch.float32),which_digit.to(torch.float32)
 
+class MNST(Problem): # implementing the MNST problem where the input of handwritten 
+    #digits are train to connected hand written digits with numbers
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def get_input_and_target(self):        
+        data_half,data_full,num_half,num_full,data,which_digit = self.MNST_data()        
+                    
+        return data.to(torch.float32),which_digit.to(torch.float32)
+
+class MNST_one_hot(Problem): # implementing the MNST problem where the input of handwritten 
+    #digits are train to connected hand written digits with numbers
+    def __init__(self, num_classes=None,  **kwargs):
+        super().__init__(**kwargs)
+        
+        if not num_classes:
+            num_classes = 10
+        self.num_classes = num_classes
+
+#        self.one_hot = torch.zeros((self.nbatch, num_classes))
+
+    def get_input_and_target(self):        
+        data_half,data_full,num_half,num_full,data,which_digit = self.MNST_data()        
+#        self.one_hot[:] = 0.0
+#        self.one_hot[:,which_digit] = 1.0
+        
+        return data.to(torch.float32), which_digit.to(torch.float32)
     
-
-
 class circumference(Problem): # takes input radius and finds circumference of circle
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -361,7 +395,7 @@ class roots_of_poly(Problem):
     def get_input_and_target(self):
     
         x = np.random.normal(size=(self.nbatch,self.npts))
-        y = np.zeros_like(x); y = np.concatenate((y,y),axis=1);
+        y = np.zeros_like(x); y = np.concatenate((y,y),axis=1)
         
         xaug = np.concatenate((np.ones((self.nbatch,1)),x),axis=1)
         for i in range(self.nbatch):
@@ -715,4 +749,31 @@ class abs_fft(Problem):
         y = y.to(torch.float32)
         
         return x,y
+        
+class rotate_n_degrees(Problem):
+    def __init__(self, angle=None, **kwargs):
+        super().__init__(**kwargs)
+        self.loader = iter(self.MNST_loader())
+        
+        if not angle:
+            self.angle = 90
+        else:
+            self.angle = angle
+                
+            
+    def get_input_and_target(self):
+        print('angle is',self.angle)
+        images, labels = next(self.loader)
+        target = np.zeros_like(images)
+        target = np.transpose(target, axes=(0,2,3,1))
+        print('target shape is', target.shape)
+        
+        imgnp = np.transpose(images.numpy(),axes=(0,2,3,1))
+        for i,l in enumerate(labels):
+            img = imgnp[i,:,:,:]
+            target[i,:,:,:] = transform.rotate(img, self.angle)
+        
+        target = torch.from_numpy(np.transpose(target,axes=(0,3,1,2)))
+        return images , target
+
         
