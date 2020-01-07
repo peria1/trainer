@@ -34,7 +34,9 @@ class trainer():
         
         self.set_device()
 
+        print('kwargs is',kwargs)
         self.problem = problem_class(**kwargs)
+        print('problem is',self.problem)
                    
         self.data_generator = self.problem.get_input_and_target
                             
@@ -42,23 +44,27 @@ class trainer():
         self.xtest = self.xtest.to(self.device)
         self.ytest = self.ytest.to(self.device)
         
-        self.npts = None
-#        self.consume_keyword(kwargs, 'npts', self.npts, self.xtest.size()[1])
-        if 'npts' in kwargs:
-            self.npts = kwargs['npts']
-            kwargs.pop('npts')
-        else:
-            self.npts = self.xtest.size()[1]
-            
-        if 'nout' in kwargs:
-            self.nout = kwargs['nout']
-            kwargs.pop('nout')
-        else:
-            self.nout = self.ytest.size()[1]
+#        if len(self.xtest.size()) == 2:
+#            self.npts = None
+#            if 'npts' in kwargs:
+#                self.npts = kwargs['npts']
+#                kwargs.pop('npts')
+#            else:
+#                self.npts = self.xtest.size()[1]
+#        else:
+#            self.npts = np.prod(self.xtest.size()[1:])
+#            
+#        if 'nout' in kwargs:
+#            self.nout = kwargs['nout']
+#            kwargs.pop('nout')
+#        else:
+#            if len(self.ytest.size())==2:
+#                self.nout = self.ytest.size()[1]
+#            else:
+#                self.nout = None
         
-
         trainee = \
-        trainee_class(**kwargs,npts=self.npts,nout=self.nout).to(self.device)
+        trainee_class(self.problem, **kwargs).to(self.device)
         self.model = trainee # a trainee needs an optimzer and a criterion, 
                                            #   as well as a way to generate data.
 
@@ -71,19 +77,19 @@ class trainer():
         self.train_loss_history = []
         self.test_loss_history = []
                        
-#        print('trainer device is ',self.device)
         if reload:  # does not work on Windows, can't get Tk to work
             self.model.load_state_dict(torch.load(uichoosefile()))
                      
 
+        self.res_bad = False
         try:
             assert(self.model(self.xtest).size()==self.ytest.size())
         except AssertionError:
-            print('Model predictions need to have the same dimensions as the targets.')
+            print('Model prediction and target dimensions differ.')
+            print('This may indicate a serious problem, and for sure you cannot look at resiuduals.')
             print('Prediction: ', self.model(self.xtest).size())
             print('Target: ', self.ytest.size())
-            self.model = None
-            return
+            self.res_bad = True
         
         if 'custom_loss' in dir(self.model):
             self.criterion = self.model.custom_loss
@@ -108,8 +114,7 @@ class trainer():
         
         self.optimizer.zero_grad()  # Make the gradients zero to start the step.
         pred = self.model(input)      #  Find the current predictions, yhat. 
-#        print(type(pred), pred.size(), type(target),target.size())
-        loss = self.criterion(pred, target)  # Check the MSE between y and yhat. 
+        loss = self.criterion(pred, target)  
         loss.backward()      # Do back propagation! Thank you Pytorch!
         self.optimizer.step()     # take one step down the gradient. 
         
@@ -135,23 +140,33 @@ class trainer():
                 steploss = self.train_step(x,y)
                 self.train_loss_history.append(steploss)
             
-            res = (model(xtest)-ytest).cpu().detach().numpy()
-            pos = res > 0
-            neg = res < 0
-        
-            if np.sum(pos) > 0 and np.sum(neg) > 0:
-                h, p, ks = kscirc(yp[pos], yp[neg])
-            else:
-                p = 0.
-            
-            self.p_history.append(p)
-            
+            if not self.res_bad:
+                try:
+                    res = (model(xtest)-ytest).cpu().detach().numpy()
+                    pos = res > 0
+                    neg = res < 0
+                
+                    if np.sum(pos) > 0 and np.sum(neg) > 0:
+                        h, p, ks = kscirc(yp[pos], yp[neg])
+                    else:
+                        p = 0.
+                    
+                    self.p_history.append(p)
+                except RuntimeError:
+                    print('Problem with residuals.')
+                    self.res_bad = True
+
             self.test_loss_history.append(self.test(xtest,ytest))
 
             up_since_last = self.test_loss_history[-1] > self.train_loss_history[-1]
             larger_than_recent_average = \
             self.test_loss_history[-1] > np.mean(self.test_loss_history[-ppb:-1])
-            kscirc_plausible = p > self.min_pval
+            if not self.res_bad:
+                kscirc_plausible = p > self.min_pval
+            else:
+                kscirc_plausible = True
+                
+                
             loss_small_enough = self.test_loss_history[-1] < self.max_loss 
 
             done =  up_since_last and \
@@ -159,7 +174,11 @@ class trainer():
              kscirc_plausible and \
              loss_small_enough  # ignored if user did not set max_loss keyword
             
-            loss_str = f'Test loss: {self.test_loss_history[-1]:6.3e}    p:  {p:5.2e}'
+            if not self.res_bad:
+                loss_str = f'Test loss: {self.test_loss_history[-1]:6.3e}    p:  {p:5.2e}'
+            else:
+                loss_str = f'Test loss: {self.test_loss_history[-1]:6.3e} '
+            
             loss_str = self.get_model_name() + ' ' + loss_str
             
             if done:
