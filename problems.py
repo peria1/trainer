@@ -182,15 +182,15 @@ class MNST_multi_solver(Problem): # this MNST problem continuously selects rando
             total_opp[i] = operations_list[value][0](num_half[i],num_full[i])
             total_pic[i] = np.concatenate((data_half[i],operations_list[value][1],data_full[i]))
         
-        pts = total_pic.shape
-        self.npts = pts[1] * pts[2]
+#        pts = total_pic.shape
+#        self.npts = pts[1] * pts[2]
         
         inp = torch.from_numpy(total_pic)
         target = torch.from_numpy(total_opp)
     
             
-        return inp.view(-1,self.npts).to(torch.float32), target.reshape(-1,1).to(torch.float32)
-    
+#        return inp.view(-1,self.npts).to(torch.float32), target.reshape(-1,1).to(torch.float32)
+        return inp.reshape(64,1,84,28).to(torch.float32), target.reshape(-1,1).to(torch.float32)    
     
 class MNST_all_solver(Problem): #using handwritten digits and artimatic symbol to perform
     # all opperations on all of the data set 
