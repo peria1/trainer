@@ -198,7 +198,7 @@ class MNST_multi_solver(Problem): # this MNST problem continuously selects rando
         
         inp = torch.from_numpy(total_pic)
         target = torch.from_numpy(total_opp)
-    
+        self.nbatch = nbatch//2
             
 #        return inp.view(-1,self.npts).to(torch.float32), target.reshape(-1,1).to(torch.float32)
         return inp.reshape(64,1,84,28).to(torch.float32), target.reshape(-1,1).to(torch.float32)    

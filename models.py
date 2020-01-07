@@ -393,7 +393,6 @@ class VGGNet(VGG):
 
         if not num_classes:
             num_classes = 1000
-
         if not nbatch:
             nbatch = problem.nbatch
 
