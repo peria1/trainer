@@ -208,12 +208,15 @@ class MNST_multi_solver(Problem): # this MNST problem continuously selects rando
         for i in range (nbatch//2):  #creates a image display and mathimatical opp. for  equations   
             value = index_opperation() #reinteration of a new operation per data set
             total_opp[i] = operations_list[value][0](num_half[i],num_full[i])
-            total_pic[i] = np.concatenate((data_half[i],operations_list[value][1],data_full[i]))
+#            print('dh shape, op list df shape',data_half.shape, operations_list[value][1].shape, data_full.shape)
+            total_pic[i] = np.concatenate((data_half[i],\
+                     np.reshape(operations_list[value][1],(1,28,28)),\
+                     data_full[i]),axis=1)
         
 #        pts = total_pic.shape
 #        self.npts = pts[1] * pts[2]
         
-        inp = torch.from_numpy(total_pic)
+        inp = torch.from_numpy(total_pic).reshape((nbatch//2, 1, img_size*3, img_size))
         target = torch.from_numpy(total_opp)
         self.nbatch = nbatch//2
             
