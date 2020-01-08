@@ -63,8 +63,7 @@ class trainer():
 #            else:
 #                self.nout = None
         
-        trainee = \
-        trainee_class(self.problem, **kwargs).to(self.device)
+        trainee = trainee_class(self.problem, **kwargs).to(self.device)
         self.model = trainee # a trainee needs an optimzer and a criterion, 
                                            #   as well as a way to generate data.
 
@@ -86,7 +85,7 @@ class trainer():
             assert(self.model(self.xtest).size()==self.ytest.size())
         except AssertionError:
             print('Model prediction and target dimensions differ.')
-            print('This may indicate a serious problem, and for sure you cannot look at resiuduals.')
+            print('This may indicate a serious problem, and for sure you cannot look at residuals.')
             print('Prediction: ', self.model(self.xtest).size())
             print('Target: ', self.ytest.size())
             self.res_bad = True
