@@ -68,6 +68,7 @@ class bisect_to_power_of_two(nn.Module):
         
         self.npts = npts
         self.nbatch = nbatch
+        self.nout = nout
         
         n = npts*2
         self.layer_list = nn.ModuleList([nn.Linear(npts,n)])
@@ -443,7 +444,7 @@ class VGGNet(VGG):
         
         score = self.classifier(torch.flatten(self.avgpool(output['x5']),1))
 
-        return torch.sigmoid(score)
+        return torch.softmax(score,1)
 
 
 

@@ -303,9 +303,7 @@ class MNST_stack(Problem): # implenenting the MNST problem where the input of ha
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def get_input_and_target(self):
-        nbatch = self.nbatch
-        
+    def get_input_and_target(self):        
         data_half,data_full,num_half,num_full,data,which_digit = self.MNST_data()
         
         xs = data.size()
@@ -323,25 +321,25 @@ class MNST(Problem): # implementing the MNST problem where the input of handwrit
     def get_input_and_target(self):        
         data_half,data_full,num_half,num_full,data,which_digit = self.MNST_data()        
                     
-        return data.to(torch.float32),which_digit.to(torch.float32)
-
-class MNST_one_hot(Problem): # implementing the MNST problem where the input of handwritten 
-    #digits are train to connected hand written digits with numbers
-    def __init__(self, num_classes=None,  **kwargs):
-        super().__init__(**kwargs)
-        
-        if not num_classes:
-            num_classes = 10
-        self.num_classes = num_classes
-
-#        self.one_hot = torch.zeros((self.nbatch, num_classes))
-
-    def get_input_and_target(self):        
-        data_half,data_full,num_half,num_full,data,which_digit = self.MNST_data()        
-#        self.one_hot[:] = 0.0
-#        self.one_hot[:,which_digit] = 1.0
-        
-        return data.to(torch.float32), which_digit.to(torch.float32)
+        return data.to(torch.float32),which_digit.to(torch.long)
+#
+#class MNST_one_hot(Problem): # implementing the MNST problem where the input of handwritten 
+#    #digits are train to connected hand written digits with numbers
+#    def __init__(self, num_classes=None,  **kwargs):
+#        super().__init__(**kwargs)
+#        
+#        if not num_classes:
+#            num_classes = 10
+#        self.num_classes = num_classes
+#
+##        self.one_hot = torch.zeros((self.nbatch, num_classes))
+#
+#    def get_input_and_target(self):        
+#        data_half,data_full,num_half,num_full,data,which_digit = self.MNST_data()        
+##        self.one_hot[:] = 0.0
+##        self.one_hot[:,which_digit] = 1.0
+#        
+#        return data.to(torch.float32), which_digit.to(torch.float32)
     
 class circumference(Problem): # takes input radius and finds circumference of circle
     def __init__(self, **kwargs):
