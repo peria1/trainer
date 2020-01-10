@@ -4,6 +4,10 @@ Created on Mon Oct 21 06:16:10 2019
 
 @author: Bill
 """
+# Uncomment the following two lines to get more informative traceback messages
+# for errors that occur on the GPU
+#import os
+#os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
 import matplotlib.pyplot as plt
 import trainer as tr
