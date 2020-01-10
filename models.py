@@ -18,6 +18,7 @@ import torch
 import torch.utils.data
 from torch import nn
 from torchvision.models.vgg import VGG
+import numpy as np
 
 class one_linear_layer(nn.Module):
     def __init__(self, problem):
@@ -389,7 +390,7 @@ class VGGNet(VGG):
                  model='vgg16', requires_grad=True, \
                  show_params=False, GPU = False):
         from VGGdefs import ranges, cfg, make_layers
-        import numpy as np
+
 
         if not num_classes:
             num_classes = 1000
@@ -421,11 +422,15 @@ class VGGNet(VGG):
                 param.cuda()
                 
         self.custom_loss = self.vggloss
+        
         self.criterion = torch.nn.CrossEntropyLoss()
+
         
     def vggloss(self,pred,target):
-            
+        
         return self.criterion(pred, target.to(torch.long))
+    
+
 
     def forward(self, x):
         output = {}
