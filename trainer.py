@@ -34,13 +34,12 @@ class trainer():
         
         self.set_device()
 
-        print('kwargs is',kwargs)
         self.problem = problem_class(**kwargs)
-        print('problem is',self.problem)
                    
         self.data_generator = self.problem.get_input_and_target
                             
         self.xtest, self.ytest = self.data_generator()
+        
         self.xtest = self.xtest.to(self.device)
         self.ytest = self.ytest.to(self.device)
         
@@ -63,7 +62,7 @@ class trainer():
 #            else:
 #                self.nout = None
         
-        trainee = trainee_class(self.problem, **kwargs).to(self.device)
+        trainee = trainee_class(self.problem).to(self.device)
         self.model = trainee # a trainee needs an optimzer and a criterion, 
                                            #   as well as a way to generate data.
 
