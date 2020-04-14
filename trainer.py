@@ -203,11 +203,21 @@ class trainer():
             self.viewer.update_displays()
             self.viewer.arm_start_button()
             
-            torch.save(self.model.state_dict(), \
-                       'saved_trained_states' + get_slash() + \
-                       self.model.__class__.__name__ + \
-                       date_for_filename())
+            self.save_model()
+            
+#            torch.save(self.model.state_dict(), \
+#                       'saved_trained_states' + get_slash() + \
+#                       self.model.__class__.__name__ + \
+#                       date_for_filename())
 
+    def save_model(self):
+        torch.save(self.model.state_dict(), \
+           'saved_trained_states' + get_slash() + \
+           self.model.__class__.__name__ + \
+           date_for_filename())
+
+
+   
     def set_device(self):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
