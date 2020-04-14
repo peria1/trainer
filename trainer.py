@@ -41,8 +41,11 @@ class trainer():
         self.xtest, self.ytest = self.data_generator()
         
         self.xtest = self.xtest.to(self.device)
-        self.ytest = self.ytest.to(self.device)
-        
+        try:
+            self.ytest = self.ytest.to(self.device)
+        except AttributeError:
+            pass
+                
 #        if len(self.xtest.size()) == 2:
 #            self.npts = None
 #            if 'npts' in kwargs:
@@ -88,7 +91,9 @@ class trainer():
             print('Prediction: ', self.model(self.xtest).size())
             print('Target: ', self.ytest.size())
             self.res_bad = True
-        
+        except AttributeError:
+            print('yo, it''s a dictionary!')
+            
         if 'custom_loss' in dir(self.model):
             self.criterion = self.model.custom_loss
         else:
@@ -103,7 +108,11 @@ class trainer():
                                   #  running and reporting a test, and grabbing new data. 
         
         self.xp = self.xtest.cpu().detach().numpy()  # these are useful for doing 
-        self.yp = self.ytest.cpu().detach().numpy()  #  testing in numpy rather than torch. 
+        try:
+            self.yp = self.ytest.cpu().detach().numpy()  #  testing in numpy rather than torch. 
+        except AttributeError:
+            self.yp = self.ytest
+            print('ytest type is',type(self.ytest),'...cannot move to numpy')
 
         self.zap_history()        
 
@@ -223,7 +232,10 @@ class trainer():
         
     def get_more_data(self):
         x,y = self.data_generator()
-        return x.to(self.device), y.to(self.device)
+        try:
+            return x.to(self.device), y.to(self.device)
+        except AttributeError:
+            return x.to(self.device), y
     
     def zap_history(self):
         state = self.pause

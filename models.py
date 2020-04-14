@@ -477,6 +477,7 @@ class YOLAB(nn.Module):
                                  neg_threshold=D.cfg.negative_iou_threshold,
                                  negpos_ratio=D.cfg.ohem_negpos_ratio)
 
+        self.net = net
         self.criterion = criterion
 
     def forward(self, images): 

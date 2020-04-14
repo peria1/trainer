@@ -76,11 +76,13 @@ class trainer_view():
                                                update=tp.gram_weights)]
 #                         self.Training_Display(name='magnitudes',\
 #                                               update=tp.numbers_check)]
-                         
-        if self.trainer.ytest.size() == self.trainer.xtest.size():
-#            print('adding examples plot...')
-            self.displays.append(self.Training_Display(name='examples', active = False,\
-                                               update=tp.example_plot))
+        try:             
+            if self.trainer.ytest.size() == self.trainer.xtest.size():
+    #            print('adding examples plot...')
+                self.displays.append(self.Training_Display(name='examples', active = False,\
+                                                   update=tp.example_plot))
+        except AttributeError: 
+            print('Attribute error, not adding examples plot...')
 
 #        # Button layout, for a column at the right-hand side of window. 
         text_box_left_edge = 0.85

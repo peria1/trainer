@@ -902,7 +902,12 @@ class COCOlike(Problem):
         self.loader  = iter(self.data_loader)
 
 
-    def local_prepare_data(datum, devices:list=None, allocation:list=None):
+    def gradinator(self, x):
+        x.requires_grad = False
+        return x
+
+
+    def local_prepare_data(self, datum, devices:list=None, allocation:list=None):
         batch_size = 4
         with torch.no_grad():
             if devices is None:
@@ -920,9 +925,9 @@ class COCOlike(Problem):
             for device, alloc in zip(devices, allocation):
                 for _ in range(len(images)):
     #                print('cur_idx is ',cur_idx)
-                    images[cur_idx]  = gradinator(images[cur_idx].to(device))
-                    targets[cur_idx] = gradinator(targets[cur_idx].to(device))
-                    masks[cur_idx]   = gradinator(masks[cur_idx].to(device))
+                    images[cur_idx]  = self.gradinator(images[cur_idx].to(device))
+                    targets[cur_idx] = self.gradinator(targets[cur_idx].to(device))
+                    masks[cur_idx]   = self.gradinator(masks[cur_idx].to(device))
                     cur_idx += 1
     
     #        if D.cfg.preserve_aspect_ratio:
