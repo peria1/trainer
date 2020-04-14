@@ -481,15 +481,21 @@ class YOLAB(nn.Module):
         self.criterion = criterion
 
     def forward(self, images): 
-        self.predsT = self.net(images)
-        return self.predsT
+        predsT = self.net(images)
+        return predsT
     
-    def custom_loss(self, input, target):        
+    def custom_loss(self, predsT, target):        
         targets, masks, num_crowds = target
-        losses = self.criterion(self.net, self.predsT, targets[0], masks[0], num_crowds[0])
-        self.loss = sum([losses[k] for k in losses])
+        self.net.train()
+#        print('custom loss, images has type',type(images))
+#        if type(images) is dict:
+#            print(images.keys())
+            
+#        predsT = self.net(images)
+        losses = self.criterion(self.net, predsT, targets[0], masks[0], num_crowds[0])
+        loss = sum([losses[k] for k in losses])
         
-        return self.loss
+        return loss
 
 
 

@@ -39,6 +39,10 @@ class trainer():
         self.data_generator = self.problem.get_input_and_target
                             
         self.xtest, self.ytest = self.data_generator()
+        print('Top of trainer, type of xtest is',type(self.xtest))
+        print('type of ytest is',type(self.ytest))
+        if type(self.ytest) is dict:
+            print(self.ytest.keys())
         
         self.xtest = self.xtest.to(self.device)
         try:
@@ -95,6 +99,7 @@ class trainer():
             print('yo, it''s a dictionary!')
             
         if 'custom_loss' in dir(self.model):
+            print('Using',self.get_model_name(),'custom loss ...')
             self.criterion = self.model.custom_loss
         else:
             self.criterion = nn.MSELoss()
@@ -159,7 +164,7 @@ class trainer():
                         p = 0.
                     
                     self.p_history.append(p)
-                except RuntimeError:
+                except (RuntimeError, TypeError):
                     print('Problem with residuals.')
                     self.res_bad = True
 
