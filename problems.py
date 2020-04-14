@@ -15,6 +15,18 @@ from PIL import Image
 import skimage
 
 from skimage import transform
+
+import sys
+if not 'yolact' in sys.path[1]:
+    sys.path.insert(1, '../yolact/')
+    
+import yolact
+from utils.augmentations import SSDAugmentation #, FastBaseTransform, BaseTransform
+from yolact import Yolact
+from train import  NetWithLoss, CustomDataParallel, MultiBoxLoss, prepare_data
+import data as D  
+
+
 """
 The superclass Problem takes care of things common to all of our "math
     problem" data sets, like default dimensions and the requirement to 
@@ -495,6 +507,54 @@ class tri_to_area(Problem): # takes input of triange vertices and finds area
         return self.move_to_torch(x, get_areas(x).reshape((nbatch,1)))
 
 
+class equivalence(Problem):
+    def __init__(self,**kwargs):
+        super().__init__(**kwargs)
+    
+    def get_input_and_target(self):
+        x = np.random.normal(size=(self.nbatch, self.npts))
+        noise = np.random.normal(size=(self.nbatch,self.npts))/50.0
+        y = x + noise
+        return self.move_to_torch(x,y)
+
+class plus_constant(Problem):
+    def __init__(self,**kwargs):
+        super().__init__(**kwargs)
+    
+    def get_input_and_target(self):
+        nbatch = self.nbatch
+        npts = self.npts
+        
+        half = int(npts/2)
+        xsize = (nbatch,half)
+        
+        xrange = 20.0
+        brange = 10.0
+        
+        noiseamp = np.random.uniform(low=xrange/100.0, high = xrange/20.0, size=(nbatch,1))
+        noise = np.random.normal(scale=noiseamp,size=xsize)
+        b = np.random.uniform(-brange,brange,size=(nbatch,1))
+        
+        x = np.random.uniform(low=-xrange, high=xrange, size=xsize)
+        y = x + b 
+        y = y + noise
+        
+        x = torch.from_numpy(x).to(torch.float)
+        y = torch.from_numpy(y).to(torch.float)
+        xy = torch.cat((x,y),1)
+        
+        bs = torch.from_numpy(b).to(torch.float)
+        
+        return xy, bs
+    
+#    def get_input_and_target(self):
+#        x = np.random.normal(size=(self.nbatch, self.npts))
+#        noise = np.random.normal(size=(self.nbatch,self.npts))/50.0
+#        offset = np.random.normal()
+#        y = x + noise
+#        return self.move_to_torch(x,y)
+#
+
 class plain_sum_of_x(Problem):
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
@@ -796,3 +856,94 @@ class rotate_n_degrees(Problem):
         return images , target
 
         
+class COCOlike(Problem):
+    def __init__(self, **kwargs):
+        import matplotlib
+        super().__init__(**kwargs)
+        
+        path_prefix = '../yolact/'
+        
+        backend_I_want = matplotlib.get_backend()
+        dataset = D.COCODetection(image_path = path_prefix + (D.cfg.dataset.train_images)[1:],
+                                info_file= path_prefix + 'data/coco/annotations/milliCOCO.json',
+                                transform=SSDAugmentation(D.MEANS))
+    
+        if matplotlib.get_backend() != backend_I_want:
+            matplotlib.use(backend_I_want)    
+        
+        batch_size = 4
+        num_workers = 0 # force everything onto a single process. 
+        
+        self.data_loader = torch.utils.data.DataLoader(dataset, batch_size,
+                                      num_workers=num_workers,
+                                      shuffle=True, 
+                                      collate_fn=D.detection_collate,
+                                      pin_memory=True)
+        
+        self.loader  = iter(self.data_loader)
+
+
+    def local_prepare_data(datum, devices:list=None, allocation:list=None):
+        batch_size = 4
+        with torch.no_grad():
+            if devices is None:
+                devices = ['cuda:0'] #if args.cuda else ['cpu']
+            if allocation is None:
+    #            allocation = [args.batch_size // len(devices)] * (len(devices) - 1)
+                allocation = [batch_size // len(devices)] * (len(devices) - 1)
+    #            allocation.append(args.batch_size - sum(allocation)) # The rest might need more/less
+                allocation.append(batch_size - sum(allocation)) # The rest might need more/less
+            
+            images, (targets, masks, num_crowds) = datum
+    
+            cur_idx = 0
+    #        print(len(images))
+            for device, alloc in zip(devices, allocation):
+                for _ in range(len(images)):
+    #                print('cur_idx is ',cur_idx)
+                    images[cur_idx]  = gradinator(images[cur_idx].to(device))
+                    targets[cur_idx] = gradinator(targets[cur_idx].to(device))
+                    masks[cur_idx]   = gradinator(masks[cur_idx].to(device))
+                    cur_idx += 1
+    
+    #        if D.cfg.preserve_aspect_ratio:
+    #            # Choose a random size from the batch
+    #            _, h, w = images[random.randint(0, len(images)-1)].size()
+    #
+    #            for idx, (image, target, mask, num_crowd) in enumerate(zip(images, targets, masks, num_crowds)):
+    #                images[idx], targets[idx], masks[idx], num_crowds[idx] \
+    #                    = enforce_size(image, target, mask, num_crowd, w, h)
+            
+            cur_idx = 0
+            split_images, split_targets, split_masks, split_numcrowds \
+                = [[None for alloc in allocation] for _ in range(4)]
+    
+            for device_idx, alloc in enumerate(allocation):
+                split_images[device_idx]    = torch.stack(images[cur_idx:cur_idx+alloc], dim=0)
+                split_targets[device_idx]   = targets[cur_idx:cur_idx+alloc]
+                split_masks[device_idx]     = masks[cur_idx:cur_idx+alloc]
+                split_numcrowds[device_idx] = num_crowds[cur_idx:cur_idx+alloc]
+    
+                cur_idx += alloc
+    
+            return split_images, split_targets, split_masks, split_numcrowds
+
+
+
+    def get_input_and_target(self):
+        try:
+            datum = next(self.loader)
+        except StopIteration:
+            self.loader = iter(self.data_loader)
+            datum = next(self.loader)
+                        
+        images, targets, masks, num_crowds = self.local_prepare_data(datum)
+
+
+        return images[0], (targets, masks, num_crowds)
+    
+    
+    
+    
+    
+    
