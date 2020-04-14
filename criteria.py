@@ -43,22 +43,47 @@ def target_residual_correlation(yhat,y):
     corrs = torch.mean(dx*dy,0,keepdim=True)/(sx*sy)
 #    print('individual corrs',corrs)
 
-    return torch.mean(torch.abs(corrs))
+    return torch.abs(corrs)
+
+def target_residual_slope(yhat,y):
+    rho = target_residual_correlation(yhat,y)
+    dres = torch.std(yhat-y,0,keepdim=True)
+    dy = torch.std(yhat-y,0,keepdim=True)
+    
+    return rho*dres/dy
 
 def mse_plus_corr(yhat,y):
     mse = nn.MSELoss()
-    return mse(yhat,y) + target_residual_correlation(yhat,y)
+    return mse(yhat,y) + torch.mean(target_residual_correlation(yhat,y))
+
+def mse_plus_slope(yhat,y):
+    mse = nn.MSELoss()
+    return mse(yhat,y) + torch.mean(target_residual_slope(yhat,y))
+    
 
 def L1_plus_corr(yhat,y,alpha=None):
     if not alpha:
         alpha = 1.0
 
     L1 = nn.L1Loss()
-    return L1(yhat,y) + alpha*target_residual_correlation(yhat,y)
+    return L1(yhat,y) + alpha*torch.mean(target_residual_correlation(yhat,y))
 
 def diff_and_product(yhat,y):
     L1 = nn.L1Loss()
-    return (1+target_residual_correlation(yhat,y))*L1(yhat,y)
+    return (1+torch.mean(target_residual_correlation(yhat,y)))*L1(yhat,y)
+
+def diff_and_slope(yhat,y):
+    L1 = nn.L1Loss()
+    return (1+torch.sum(target_residual_slope(yhat,y)))*L1(yhat,y)
 
 
+def max_abs(yhat,y):
+    return torch.max(torch.abs(yhat-y))
+
+def diff_and_max(yhat,y):
+    L1 = nn.L1Loss()
+    return L1(yhat,y) + max_abs(yhat, y)
+
+def diff_max_slope(yhat,y):
+    return diff_and_max(yhat,y) + torch.sum(target_residual_slope(yhat,y))
 
