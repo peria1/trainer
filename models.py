@@ -19,6 +19,22 @@ import torch.utils.data
 from torch import nn
 from torchvision.models.vgg import VGG
 
+#from criteria import *
+#from ..yolact.data import *
+#from .. import *
+#from ..yolact.yolact import *
+import sys
+if not 'yolact' in sys.path[1]:
+    sys.path.insert(1, '../yolact/')
+    
+import yolact
+from utils.augmentations import SSDAugmentation #, FastBaseTransform, BaseTransform
+from yolact import Yolact
+from train import  NetWithLoss, CustomDataParallel, MultiBoxLoss, prepare_data
+import data as D  
+
+
+
 class one_linear_layer(nn.Module):
     def __init__(self, problem):
         super().__init__()
@@ -440,6 +456,34 @@ class VGGNet(VGG):
         score = self.classifier(torch.flatten(self.avgpool(output['x5']),1))
 
         return torch.softmax(score,1)
+
+
+class YOLAB(nn.Module):
+    
+    def __init__(self, problem):
+        super().__init__()
+        
+        net = Yolact()
+        net.train()
+        net.init_weights(backbone_path='../yolact/weights/' + D.cfg.backbone.path)
+
+        criterion = MultiBoxLoss(num_classes=D.cfg.num_classes,
+                                 pos_threshold=D.cfg.positive_iou_threshold,
+                                 neg_threshold=D.cfg.negative_iou_threshold,
+                                 negpos_ratio=D.cfg.ohem_negpos_ratio)
+
+        self.criterion = criterion
+
+    def forward(self, images): 
+        self.predsT = self.net(images)
+        return self.predsT
+    
+    def custom_loss(self, input, target):        
+        targets, masks, num_crowds = target
+        losses = self.criterion(self.net, self.predsT, targets[0], masks[0], num_crowds[0])
+        self.loss = sum([losses[k] for k in losses])
+        
+        return self.loss
 
 
 
