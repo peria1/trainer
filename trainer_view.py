@@ -6,8 +6,8 @@ Created on Mon Oct 21 06:16:10 2019
 """
 # Uncomment the following two lines to get more informative traceback messages
 # for errors that occur on the GPU
-#import os
-#os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
+import os
+os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
 import matplotlib.pyplot as plt
 import trainer as tr
@@ -175,7 +175,7 @@ class trainer_view():
     def clear_history(self,event):
         self.trainer.zap_history()
     
-    def close_it_down(self,event):
+    def close_it_down(self,event): #TODO catch error when windows already closed etc
         for d in self.displays:
             if d.active:
                 plt.close(d.fig)
