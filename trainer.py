@@ -15,6 +15,10 @@ from models import *
 from problems import *
 from trainer_utils import kscirc, uichoosefile, date_for_filename, get_slash
 
+import os
+os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
+
+
 class trainer():
     def __init__(self, trainee_class, problem_class, \
                  max_loss=None, min_pval = None, reload=False, \
@@ -48,7 +52,7 @@ class trainer():
         try:
             self.ytest = self.ytest.to(self.device)
         except AttributeError:
-            pass
+            pass               
                 
 #        if len(self.xtest.size()) == 2:
 #            self.npts = None
@@ -133,7 +137,8 @@ class trainer():
         return loss.item()
     
     def test(self,input,target):
-        self.model.eval()  # make sure model is in testing mode
+#        if self.get_model_name() != 'YOLAB':
+#            self.model.eval()  # make sure model is in testing mode
         pred = self.model(input)      #  Find the current predictions, yhat. 
         loss = self.criterion(pred, target)  # Check the MSE between y and yhat. 
         return loss.item()
@@ -165,7 +170,7 @@ class trainer():
                     
                     self.p_history.append(p)
                 except (RuntimeError, TypeError):
-                    print('Problem with residuals.')
+                    print('Problem with residuals. Skipping on future iterations')
                     self.res_bad = True
 
             self.test_loss_history.append(self.test(xtest,ytest))
