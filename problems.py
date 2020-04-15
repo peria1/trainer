@@ -897,7 +897,7 @@ class COCOlike(Problem):
                                       num_workers=num_workers,
                                       shuffle=True, 
                                       collate_fn=D.detection_collate,
-                                      pin_memory=True)
+                                      pin_memory=False)
         
         self.loader  = iter(self.data_loader)
 
@@ -958,6 +958,7 @@ class COCOlike(Problem):
         try:
             datum = next(self.loader)
         except StopIteration:
+            print('hit stop iteration in get_input_and_target')
             self.loader = iter(self.data_loader)
             datum = next(self.loader)
                         
