@@ -206,7 +206,7 @@ class trainer_view():
                 except (TypeError, AttributeError) as e:
                     print(e)
                     d.ax.clear()             
-                d.update(self,d)   # this is calling the custom plotting function
+                d.update(self, d)   # this is calling the custom plotting function
                 d.first = False
                 d.fig.canvas.draw()
                 d.fig.canvas.flush_events()

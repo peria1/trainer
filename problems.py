@@ -882,13 +882,27 @@ class rotate_n_degrees(Problem):
 class COCOlike(Problem):
     def __init__(self, **kwargs):
         import matplotlib
+        import tkinter as tk
+        from tkinter import filedialog
+
         super().__init__(**kwargs)
         
         path_prefix = '../yolact/'
         
         backend_I_want = matplotlib.get_backend()
+        
+        json_file = path_prefix + 'data/coco/annotations/milliCOCO.json'
+        
+        root = tk.Tk() 
+        top = tk.Toplevel(root)
+        top.withdraw()  # ...in secret....
+
+        json_file = \
+            filedialog.askopenfilename(parent=top, \
+                                        title='Choose JSON file')
+
         dataset = D.COCODetection(image_path = path_prefix + (D.cfg.dataset.train_images)[1:],
-                                info_file= path_prefix + 'data/coco/annotations/milliCOCO.json',
+                                info_file= json_file,
                                 transform=SSDAugmentation(D.MEANS))
     
         img_ids = list(dataset.coco.imgToAnns.keys())

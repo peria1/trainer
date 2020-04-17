@@ -150,7 +150,7 @@ class trainer():
         _, yp = self.xp, self.yp
         done = False
         tests_since_update = 0
-        display_update_delay = 10 #  only update after this many tests
+        display_update_delay = 1 #  only update after this many tests
         while not (done or self.pause):
             x,y = self.get_more_data()
             for i in range(ppb):
