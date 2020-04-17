@@ -240,6 +240,8 @@ def svd_weight_plot(viewer, d):
     
 def YOLAB_eval(viewer, d):
     if d.first:
-        print('YOLAB eval update...')
+        d.infile = 'C:/Users/peria/Desktop/work/Brent Lab/git-repo/yolact/data/coco/images/000000000009.jpg'
     
-    pass
+    img = viewer.trainer.model.local_evalimage(viewer.trainer.model, d.infile)
+    d.ax.imshow(img)
+    
