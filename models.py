@@ -528,9 +528,10 @@ class YOLAB(nn.Module):
         
         img_numpy = img_numpy[:, :, (2, 1, 0)]
     
-        self.plt.imshow(img_numpy)
-        self.plt.title(path)
-        self.plt.show()
+        return img_numpy
+#        self.plt.imshow(img_numpy)
+#        self.plt.title(path)
+#        self.plt.show()
     
 
 
