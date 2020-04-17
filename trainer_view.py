@@ -84,6 +84,11 @@ class trainer_view():
         except AttributeError: 
             print('Attribute error, not adding examples plot...')
 
+        if self.trainer.get_model_name() == 'YOLAB':
+            print('Put custom YOLAB display here...')
+            self.displays.append(self.Training_Display(name='YOLAB eval', \
+                                                       update=tp.YOLAB_eval))
+
 #        # Button layout, for a column at the right-hand side of window. 
         text_box_left_edge = 0.85
         text_box_width = 0.075
@@ -176,9 +181,12 @@ class trainer_view():
         self.trainer.zap_history()
     
     def close_it_down(self,event): #TODO catch error when windows already closed etc
-        for d in self.displays:
-            if d.active:
-                plt.close(d.fig)
+        try:
+            for d in self.displays:
+                if d.active:
+                    plt.close(d.fig)
+        except AttributeError:
+            pass
 
     def set_update_flag(self, flag=True):
         if flag is True:
@@ -187,13 +195,16 @@ class trainer_view():
             self.update_plots = False
 
     def update_displays(self):
+        print('should I update displays?')
         if self.update_plots:
+            print('ok, updating displays...')
             active_displays = (d for d in self.displays if d.active)
             for d in active_displays:
                 try:
                     for a in d.ax.flatten():
                         a.clear()
-                except (TypeError, AttributeError):
+                except (TypeError, AttributeError) as e:
+                    print(e)
                     d.ax.clear()             
                 d.update(self,d)   # this is calling the custom plotting function
                 d.first = False

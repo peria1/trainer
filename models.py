@@ -472,6 +472,12 @@ class YOLAB(nn.Module):
         net.train()
         net.init_weights(backbone_path='../yolact/weights/' + D.cfg.backbone.path)
 
+
+#        print('num_classes is',D.cfg.num_classes)
+#        print('pos_threshold=',D.cfg.positive_iou_threshold)
+#        print('neg_threshold=',D.cfg.negative_iou_threshold)
+#        print('negpos_ratio=', D.cfg.ohem_negpos_ratio)
+
         criterion = MultiBoxLoss(num_classes=D.cfg.num_classes,
                                  pos_threshold=D.cfg.positive_iou_threshold,
                                  neg_threshold=D.cfg.negative_iou_threshold,

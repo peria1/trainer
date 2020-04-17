@@ -237,3 +237,9 @@ def svd_weight_plot(viewer, d):
     d.ax.set_title(d.layer_names[d.layer_to_show])
     d.fig.canvas.draw()
     d.fig.canvas.flush_events()
+    
+def YOLAB_eval(viewer, d):
+    if d.first:
+        print('YOLAB eval update...')
+    
+    pass
