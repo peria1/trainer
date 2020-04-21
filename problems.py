@@ -978,12 +978,16 @@ class COCOlike(Problem):
 
 
     def get_input_and_target(self):
-        try:
-            datum = next(self.loader)
-        except StopIteration:
-            print('hit stop iteration in get_input_and_target')
-            self.loader = iter(self.data_loader)
-            datum = next(self.loader)
+        got_datum = False
+        while not got_datum:
+            try:
+                datum = next(self.loader)
+                got_datum = True
+            except StopIteration:
+                print('hit stop iteration in get_input_and_target')
+                self.loader = iter(self.data_loader)
+            except (AssertionError, ValueError):
+                print('Problem getting datum, trying again...')
                         
         images, targets, masks, num_crowds = self.local_prepare_data(datum)
 
