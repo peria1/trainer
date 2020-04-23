@@ -240,7 +240,8 @@ def svd_weight_plot(viewer, d):
     
 def YOLAB_eval(viewer, d):
     if d.first:
-        d.infile = 'C:/Users/peria/Desktop/work/Brent Lab/git-repo/yolact/data/coco/images/000000000229.jpg'
+#        d.infile = 'C:/Users/peria/Desktop/work/Brent Lab/git-repo/yolact/data/coco/images/000000000229.jpg'
+        d.infile = 'C:/Users/peria/Desktop/work/Brent Lab/git-repo/yolact/data/coco/images/overhead1.jpg'
     
     img = viewer.trainer.model.local_evalimage(viewer.trainer.model, d.infile)
     d.ax.imshow(img)
