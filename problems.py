@@ -605,6 +605,46 @@ class quad_sum_of_x(Problem):
         y = y + noise.reshape((nbatch,1))
         return x,y
 
+class signal_to_noise_ratio(Problem):
+    """
+    I want to see if a NN can recognize pseudorandomness as a "thing". This question
+    came up in the context of Shrinker(). I have been filling in the empty borders around 
+    shrunken objects using shuffled nearest neigbor interpolation. Jamie Tremain is 
+    concerend that these borders will be features that the network needs to see around
+    a small lab object, before it will identify them. I am thinking that there is not 
+    a way to learn (and therefore require) randomness.
+    
+    Here I want to test this concept with sinusoidal signals mixed with noise. 
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.nharm = 5;
+        self.twopi = 2 * np.pi
+        self.npts = 1024
+        self.t = np.linspace(0,1,self.npts)
+        self.f = [i+1 for i in range(self.nharm)]
+        
+    def get_input_and_target(self):
+        nbatch = self.nbatch
+        time = np.tile(self.t, (self.nbatch,1))
+        
+        c = np.random.uniform(size=(self.nbatch, self.nharm))
+        csum = np.sqrt(np.sum(c**2,axis=1,keepdims=True))
+        c = c/csum
+        phi = np.random.uniform(low=0, high=self.twopi, size=(self.nbatch, self.nharm))
+
+        signal = np.zeros((self.nbatch, self.npts))
+        for i,f in enumerate(self.f):
+            phase = self.twopi*f*time + phi[:,i].reshape((self.nbatch, 1))
+            signal += c[:,i].reshape((self.nbatch,1))*np.cos(phase)
+        
+        SNR = np.random.uniform(size=(nbatch,1))
+        noise = SNR * np.random.normal(size=(self.nbatch, self.npts))
+
+        x = signal + noise
+        y = SNR
+        
+        return self.move_to_torch(x,y)
 
 class slope_and_offset_x1_vs_x0(Problem): 
     def __init__(self,**kwargs):
@@ -988,6 +1028,9 @@ class COCOlike(Problem):
                 self.loader = iter(self.data_loader)
             except (AssertionError, ValueError):
                 print('Problem getting datum, trying again...')
+            except IndexError as ie:
+                print('IndexError:',ie)
+                
                         
         images, targets, masks, num_crowds = self.local_prepare_data(datum)
 
