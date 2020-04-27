@@ -646,6 +646,37 @@ class signal_to_noise_ratio(Problem):
         
         return self.move_to_torch(x,y)
 
+class noise_free(Problem):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.nharm = 5;
+        self.twopi = 2 * np.pi
+        self.npts = 1024
+        self.t = np.linspace(0,1,self.npts)
+        self.f = [i+1 for i in range(self.nharm)]
+        
+    def get_input_and_target(self):
+        nbatch = self.nbatch
+        time = np.tile(self.t, (self.nbatch,1))
+        
+        c = np.random.uniform(size=(self.nbatch, self.nharm))
+        csum = np.sqrt(np.sum(c**2,axis=1,keepdims=True))
+        c = c/csum
+        phi = np.random.uniform(low=0, high=self.twopi, size=(self.nbatch, self.nharm))
+
+        signal = np.zeros((self.nbatch, self.npts))
+        for i,f in enumerate(self.f):
+            phase = self.twopi*f*time + phi[:,i].reshape((self.nbatch, 1))
+            signal += c[:,i].reshape((self.nbatch,1))*np.cos(phase)
+        
+        SNR = np.random.uniform(size=(nbatch,1))
+        noise = SNR * np.random.normal(size=(self.nbatch, self.npts))
+
+        x = signal + noise
+        y = signal
+        
+        return self.move_to_torch(x,y)
+
 class slope_and_offset_x1_vs_x0(Problem): 
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
