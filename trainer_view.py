@@ -97,7 +97,7 @@ class trainer_view():
         middle_edge = 0.5 - width/2.0
         height = 0.075
         text_color = 'white'
-        down_from_top = [0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2,0.1]
+        down_from_top = [0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2,0.1,  0.0]
         
 #        reg_width = 6.4
 #        reg_height = 4.8
@@ -146,34 +146,44 @@ class trainer_view():
         self.start_button.color = 'green'  # callback will toggle the color
         self.start_button.on_clicked(self.deal_with_start_button)
         
-        dispbutton = plt.axes([left_edge, down_from_top[4], width, height])
+        lrbutton = plt.axes([left_edge, down_from_top[4], width, height])
+        self.lr_button = Button(lrbutton, 'Auto LR')
+        self.lr_button.label.set_color(text_color)
+        self.lr_button.label.set_fontweight('bold')
+        self.lr_button.color = 'black'
+        self.lr_button.on_clicked(self.run_auto_lr)
+        
+        dispbutton = plt.axes([left_edge, down_from_top[5], width, height])
         self.disp_button = Button(dispbutton, 'Update Displays')
         self.disp_button.label.set_color(text_color)
         self.disp_button.label.set_fontweight('bold')
         self.disp_button.color = 'black'
         self.disp_button.on_clicked(self.deal_with_update_button)
 
-        reportbutton = plt.axes([left_edge, down_from_top[5], width, height])
+        reportbutton = plt.axes([left_edge, down_from_top[6], width, height])
         self.report_button = Button(reportbutton, 'Make Report')
         self.report_button.label.set_color(text_color)
         self.report_button.label.set_fontweight('bold')
         self.report_button.color = 'black'
         self.report_button.on_clicked(self.generate_report)
 
-        clearbutton = plt.axes([left_edge, down_from_top[6], width, height])
+        clearbutton = plt.axes([left_edge, down_from_top[7], width, height])
         self.clear_button = Button(clearbutton, 'Clear History')
         self.clear_button.label.set_color(text_color)
         self.clear_button.label.set_fontweight('bold')
         self.clear_button.color = 'black'
         self.clear_button.on_clicked(self.clear_history)
 
-        resetbutton = plt.axes([left_edge, down_from_top[7], width, height])
+        resetbutton = plt.axes([left_edge, down_from_top[8], width, height])
         self.reset_button = Button(resetbutton, 'Re-initialize')
         self.reset_button.label.set_color(text_color)
         self.reset_button.label.set_fontweight('bold')
         self.reset_button.color = 'black'
         self.reset_button.on_clicked(self.reset_model)
     
+    def run_auto_lr(self, event):
+        self.trainer.auto_set_lr()
+
     def reset_model(self, event):
         self.trainer.reset_model()
         
@@ -195,17 +205,21 @@ class trainer_view():
             self.update_plots = False
 
     def update_displays(self):
-        print('should I update displays?')
+#        print('should I update displays?')
         if self.update_plots:
-            print('ok, updating displays...')
+#            print('ok, updating displays...')
             active_displays = (d for d in self.displays if d.active)
             for d in active_displays:
                 try:
-                    for a in d.ax.flatten():
+                    for a in d.ax.flatten(): # flatten is gone from matplotlib axes? 
                         a.clear()
-                except (TypeError, AttributeError) as e:
+                except TypeError as e:
                     print(e)
-                    d.ax.clear()             
+                    d.ax.clear()
+                except AttributeError:
+                    pass
+                    d.ax.clear()
+
                 d.update(self, d)   # this is calling the custom plotting function
                 d.first = False
                 d.fig.canvas.draw()

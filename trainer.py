@@ -14,9 +14,9 @@ from torch import nn, optim
 from models import *
 from problems import *
 from trainer_utils import kscirc, uichoosefile, date_for_filename, get_slash
-
 import os
-os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
+#import os
+#os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
 
 class trainer():
@@ -43,10 +43,10 @@ class trainer():
         self.data_generator = self.problem.get_input_and_target
                             
         self.xtest, self.ytest = self.data_generator()
-        print('Top of trainer, type of xtest is',type(self.xtest))
-        print('type of ytest is',type(self.ytest))
-        if type(self.ytest) is dict:
-            print(self.ytest.keys())
+#        print('Top of trainer, type of xtest is',type(self.xtest))
+#        print('type of ytest is',type(self.ytest))
+#        if type(self.ytest) is dict:
+#            print(self.ytest.keys())
         
         self.xtest = self.xtest.to(self.device)
         try:
@@ -229,13 +229,44 @@ class trainer():
 #                       self.model.__class__.__name__ + \
 #                       date_for_filename())
 
-    def save_model(self):
-        torch.save(self.model.state_dict(), \
-           'saved_trained_states' + get_slash() + \
-           self.model.__class__.__name__ + \
-           date_for_filename())
+    def auto_set_lr(self):
+        """
+        I want to explore learning rate space to find the current best. 
+        """
+        paused = self.pause
+        self.pause = True
+        name = self.model.__class__.__name__ + 'temp_please_delete'
+        self.save_model(savename=name)
+        opt = self.optimizer
 
+        lr_try = list(10.0**np.linspace(-9,-1,100))
+        losses = np.zeros_like(lr_try)
+        for i, lr in enumerate(lr_try):
+            self.optimizer = self.optimizer_type(self.model.parameters(),lr=lr)
+            self.optimizer.step()
+            loss = self.criterion(self.model(self.xtest), self.ytest)
+            if i > 1 and loss.item() > losses[0]*10:
+                losses = losses[0:i]
+                lr_try = lr_try[0:i]
+                break
+            else:
+                losses[i] = loss.item()
 
+        self.optimizer = opt
+        
+        self.model.load_state_dict(torch.load(name))
+        os.remove(name)
+        self.pause = paused
+
+        return lr_try, losses
+    
+    def save_model(self, savename=None):
+        state = self.model.state_dict()
+        if not savename:
+            savename = 'saved_trained_states' + get_slash() + \
+               self.model.__class__.__name__ + date_for_filename()
+               
+        torch.save(state, savename)
    
     def set_device(self):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
