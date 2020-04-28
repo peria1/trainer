@@ -237,21 +237,23 @@ class trainer():
         self.pause = True
         name = self.model.__class__.__name__ + 'temp_please_delete'
         self.save_model(savename=name)
+        opt_type = self.optimizer_type
         opt = self.optimizer
 
         lr_try = list(10.0**np.linspace(-9,-1,50))
         losses = np.zeros_like(lr_try)
         for i, lr in enumerate(lr_try):
-            self.optimizer = self.optimizer_type(self.model.parameters(),lr=lr)
+            self.optimizer = torch.optim.SGD(self.model.parameters(),lr=lr)
             self.optimizer.step()
             loss = self.criterion(self.model(self.xtest), self.ytest)
             if i > 1 and loss.item() > losses[0]*1.2:
                 losses = losses[0:i]
-                lr_try = lr_try[0:i]
+                lr_try = np.cumsum(lr_try[0:i])
                 break
             else:
                 losses[i] = loss.item()
 
+        self.optimizer_type = opt_type
         self.optimizer = opt
         
         self.model.load_state_dict(torch.load(name))
@@ -265,7 +267,6 @@ class trainer():
         if not savename:
             savename = 'saved_trained_states' + get_slash() + \
                self.model.__class__.__name__ + date_for_filename()
-               
         torch.save(state, savename)
    
     def set_device(self):
