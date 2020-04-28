@@ -6,8 +6,8 @@ Created on Mon Oct 21 06:16:10 2019
 """
 # Uncomment the following two lines to get more informative traceback messages
 # for errors that occur on the GPU
-import os
-os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
+#import os
+#os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
 import matplotlib.pyplot as plt
 import trainer as tr
@@ -119,11 +119,9 @@ class trainer_view():
 #                    self.displays[i].active = not self.displays[i].active
         self.dispradio.on_clicked(toggle_active_display)
 
-        trainer_control_ax = plt.axes([middle_edge, 0.125, width, 0.75])
-#        self.criteria_button = Button()
-
-
-    
+        self.lr_ax = plt.axes([middle_edge, 0.125, width*1.5, 0.75])
+        self.lr_ax.set_xlabel('Loss vs. learning rate')
+         
         ax_loss_box = plt.axes([text_box_left_edge, down_from_top[0], text_box_width, height]) # left, bottom, width, height
         self.loss_box = TextBox(ax_loss_box, 'Max Loss: ', \
                               initial=str(self.trainer.max_loss))
@@ -182,7 +180,8 @@ class trainer_view():
         self.reset_button.on_clicked(self.reset_model)
     
     def run_auto_lr(self, event):
-        self.trainer.auto_set_lr()
+        lr, L = self.trainer.auto_set_lr()
+        self.lr_ax.loglog(lr,L,'.-')
 
     def reset_model(self, event):
         self.trainer.reset_model()
@@ -190,7 +189,7 @@ class trainer_view():
     def clear_history(self,event):
         self.trainer.zap_history()
     
-    def close_it_down(self,event): #TODO catch error when windows already closed etc
+    def close_it_down(self,event): 
         try:
             for d in self.displays:
                 if d.active:

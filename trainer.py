@@ -239,13 +239,13 @@ class trainer():
         self.save_model(savename=name)
         opt = self.optimizer
 
-        lr_try = list(10.0**np.linspace(-9,-1,100))
+        lr_try = list(10.0**np.linspace(-9,-1,50))
         losses = np.zeros_like(lr_try)
         for i, lr in enumerate(lr_try):
             self.optimizer = self.optimizer_type(self.model.parameters(),lr=lr)
             self.optimizer.step()
             loss = self.criterion(self.model(self.xtest), self.ytest)
-            if i > 1 and loss.item() > losses[0]*10:
+            if i > 1 and loss.item() > losses[0]*1.2:
                 losses = losses[0:i]
                 lr_try = lr_try[0:i]
                 break
