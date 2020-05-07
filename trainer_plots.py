@@ -10,13 +10,13 @@ def basic_loss_plot(viewer,d):
     d.ax[0].set_title(viewer.trainer.get_problem_name() +': training loss')
     d.ax[1].plot(viewer.trainer.test_loss_history)
     d.ax[1].set_title('test loss')
-    ylim = d.ax[1].get_ylim()
-    d.ax[1].set_ylim(0,ylim[1])
-    
-    max_loss = viewer.trainer.max_loss
-    if max_loss < ylim[1]:
-        xlim = d.ax[1].get_xlim()
-        d.ax[1].hlines(max_loss, xlim[0], xlim[1])
+#    ylim = d.ax[1].get_ylim()
+#    d.ax[1].set_ylim(0,ylim[1])
+#    
+#    max_loss = viewer.trainer.max_loss
+#    if max_loss < ylim[1]:
+#        xlim = d.ax[1].get_xlim()
+#        d.ax[1].hlines(max_loss, xlim[0], xlim[1])
 
 def residual_plot(viewer,d):
     residuals = viewer.trainer.yp - \
