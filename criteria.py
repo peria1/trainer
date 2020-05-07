@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Created on Fri Nov 22 17:26:31 2019
-
+stuck in merge hell
 @author: Bill
 """
 import torch
