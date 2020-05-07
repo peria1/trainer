@@ -149,7 +149,6 @@ def max_abs(yhat,y):
 def diff_and_max(yhat,y):
     L1 = nn.L1Loss()
     return L1(yhat,y) + max_abs(yhat, y)
-
 def diff_and_slope(yhat,y):
     L1 = nn.L1Loss()
     return (1+torch.sum(target_residual_slope(yhat,y)))*L1(yhat,y)
