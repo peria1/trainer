@@ -185,12 +185,16 @@ def build_gram_display(dat):
 def example_plot(viewer, d):
     if d.first:
         import numpy as np
+        import torch
         d.np = np
+        d.torch = torch
         predsize = viewer.trainer.yp.shape
         d.n_examples = predsize[0]
         
     pick = int(d.np.random.uniform(0,d.n_examples,size=(1)))
     pred = viewer.trainer.model(viewer.trainer.xtest[pick,:]).cpu().detach().numpy()
+    if type(viewer.trainer.criterion) == d.torch.nn.modules.loss.BCEWithLogitsLoss:
+        pred = 1/(1+d.np.exp(-pred))
 #    inp = viewer.trainer.xp[pick,:]
 #    ord = d.np.argsort(inp)
     target = viewer.trainer.yp[pick,:]

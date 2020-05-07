@@ -677,6 +677,54 @@ class noise_free(Problem):
         
         return self.move_to_torch(x,y)
 
+class noise_intervals(Problem):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.nharm = 5;
+        self.twopi = 2 * np.pi
+        self.npts = 1024
+        self.t = np.linspace(0,1,self.npts)
+        self.f = [i+1 for i in range(self.nharm)]
+        
+        self.maxnum = 5
+        self.maxlen = self.npts//self.maxnum
+        self.noise_rms = 0.2
+        
+    def get_input_and_target(self):
+        nbatch = self.nbatch
+        time = np.tile(self.t, (self.nbatch,1))
+        
+        c = np.random.uniform(size=(self.nbatch, self.nharm))
+        csum = np.sqrt(np.sum(c**2,axis=1,keepdims=True))
+        c = c/csum
+        phi = np.random.uniform(low=0, high=self.twopi, size=(self.nbatch, self.nharm))
+
+        signal = np.zeros((self.nbatch, self.npts))
+        for i,f in enumerate(self.f):
+            phase = self.twopi*f*time + phi[:,i].reshape((self.nbatch, 1))
+            signal += c[:,i].reshape((self.nbatch,1))*np.cos(phase)
+        
+        
+        noise = np.zeros((self.nbatch, self.npts))
+        target = np.zeros((self.nbatch, self.npts))
+        
+        for i in range(nbatch):
+            starts = np.random.randint(0,self.npts-self.maxlen,\
+                                            size=(np.random.randint(0,high=self.maxnum)))
+            runs = np.random.randint(1,self.maxlen, size=(starts.shape))
+            for j,s in enumerate(starts):
+                inc = np.random.normal(0,self.noise_rms,size=(runs[j]))
+                inc = inc - np.mean(inc)
+                noise[i, s:(s+runs[j])] = np.cumsum(inc) 
+                target[i, s:(s+runs[j])] = 1 
+
+        x = signal + noise
+        y = target
+        
+        return self.move_to_torch(x,y)
+
+
+
 class slope_and_offset_x1_vs_x0(Problem): 
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
