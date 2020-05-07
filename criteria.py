@@ -52,6 +52,7 @@ def target_residual_slope(yhat,y):
     
     return rho*dres/dy
 
+
 def target_residual_correlation2(yhat,y):
 #    import numpy as np
     
@@ -149,6 +150,17 @@ def diff_and_max(yhat,y):
     L1 = nn.L1Loss()
     return L1(yhat,y) + max_abs(yhat, y)
 
+def diff_and_slope(yhat,y):
+    L1 = nn.L1Loss()
+    return (1+torch.sum(target_residual_slope(yhat,y)))*L1(yhat,y)
+
+
+def max_abs(yhat,y):
+    return torch.max(torch.abs(yhat-y))
+
+def diff_and_max(yhat,y):
+    L1 = nn.L1Loss()
+    return L1(yhat,y) + max_abs(yhat, y)
 
 def diff_max_slope(yhat,y):
     return diff_and_max(yhat,y) + torch.sum(target_residual_slope(yhat,y))
