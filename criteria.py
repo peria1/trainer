@@ -114,8 +114,6 @@ def L1_plus_corr(yhat,y,alpha=None):
 def diff_and_product(yhat,y):
     L1 = nn.L1Loss()
     return (1+torch.mean(target_residual_correlation(yhat,y)))*L1(yhat,y)
-<<<<<<< HEAD
-
 
 def diff_and_slope(yhat,y):
     L1 = nn.L1Loss()
@@ -128,8 +126,6 @@ def max_abs(yhat,y):
 def diff_and_max(yhat,y):
     L1 = nn.L1Loss()
     return L1(yhat,y) + max_abs(yhat, y)
-=======
->>>>>>> Merged conflict involving diff_and_product*.
 
 def diff_and_product2(yhat,y):
     L1 = nn.L1Loss()
