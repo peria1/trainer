@@ -43,7 +43,7 @@ class trainer_view():
         self.fig.canvas.mpl_connect('button_press_event', self.process_button) 
         self.fig.canvas.mpl_connect('close_event', self.close_it_down)
         self.ax.set_axis_off()
-        self.fig.canvas.manager.window.raise_() # Trying to make windows visible right away
+        # self.fig.canvas.manager.window.raise_() # Trying to make windows visible right away
         
         self.trainer = tr.trainer(*args, **kwargs, viewer=self)
         if not self.trainer:
