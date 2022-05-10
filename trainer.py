@@ -110,6 +110,7 @@ class trainer():
 
         self.optimizer_type = optim.Adam
         self.optimizer = self.optimizer_type(self.model.parameters(), lr=1e-5)
+        self.eps = 0.001 # percent reduction in loss function at each iteration. 
         self.pause = False
         
         self.iter_per_batch = 10  # not sure what to do with this. Training loop will
@@ -132,6 +133,12 @@ class trainer():
         pred = self.model(input)      #  Find the current predictions, yhat. 
         loss = self.criterion(pred, target)  
         loss.backward()      # Do back propagation! Thank you Pytorch!
+        
+        # now get a new optimizer with the new gradient-adaptive learning rate
+        GAlr = self.eps*loss/normsq_grad(loss, self.model)
+        
+        for g in self.optimizer.param_groups:
+            g['lr'] = GAlr
         self.optimizer.step()     # take one step down the gradient. 
         
         return loss.item()
@@ -308,6 +315,13 @@ class trainer():
         self.pause = True
         self.model.apply(weights_init)
         self.pause = state
+
+def normsq_grad(loss, model):
+    absL2 = 0
+    for p in model.parameters():
+        absL2 += torch.sum(p.grad**2)
+        
+    return absL2
 
 #    def consume_keyword(keywords, keyword, member, value=None):
 #        if keyword in keywords:
