@@ -42,6 +42,7 @@ import copy
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
+from torch import optim
 
 def set_learning_rate(optim, lr):
     for g in optim.param_groups:
@@ -74,30 +75,50 @@ def build_gradient_vector(model):
 def capture_gradients(model):
     return {k:copy.deepcopy(v.grad) for k,v in model.named_parameters()}
           
+
+# https://discuss.pytorch.org/t/how-to-compute-magnitude-of-gradient-of-each-loss-function/138361
+# grads1 = torch.autograd.grad(loss1(output), model.parameters(), retain_graph=True)
+# grads2 = torch.autograd.grad(loss2(output), model.parameters())
+# torch.norm(torch.stack([torch.norm(p.grad.detach(), 2.0) for p in list(model.parameters())]), 2.0)
 # def grad_magnitude():
 
-def grad_angle(gsave, model):
+# In [28]: total_norm = 0.0
+#     ...: for p in model.parameters():^M
+#     ...:     param_norm = p.grad.detach().data.norm(2)^M
+#     ...:     total_norm += param_norm.item() ** 2^M
+#     ...:
+
+# BUILD MINIMAL EXAMPLE AROUND THIS
+# In [29]: ((lincheck[0]-lincheck[-1])/(max(steps)-min(steps)))/total_norm
+# Out[29]: 0.9887093111184974
+
+# In [30]: np.corrcoef(lincheck, steps)
+# Out[30]:
+# array([[ 1.        , -0.99981265],
+#        [-0.99981265,  1.        ]])
+
+def grad_angle(gdict0, gdict1):
     dot = 0.0
     norm0 = 0.0
     norm1 = 0.0
-    for k, v in model.named_parameters():
-        g0 = gsave[k]
-        g1 = v.grad
+    for k, v in gdict0.items():
+        g0 = gdict0[k]
+        g1 = gdict1[k]
         dot += torch.sum(g0*g1)
         norm0 += torch.sum(g0**2)
         norm1 += torch.sum(g1**2)
     
-    print(dot.item(), torch.sqrt(norm0).item(), torch.sqrt(norm1).item())
+    # print(dot.item(), torch.sqrt(norm0).item(), torch.sqrt(norm1).item())
     dot /= torch.sqrt(norm0*norm1)
     return torch.acos(torch.clip(dot, -1.0, 1.0))*180.0/np.pi
 
 if __name__=="__main__":
-    # tv = TV.trainer_view()
-    
-    tvt = trainer.trainer(models.n_double_nout, problems.abs_fft)
+    tvt = trainer.trainer(models.n_double_nout, problems.roots_of_poly)
     
     model = tvt.model
-    optimizer = tvt.optimizer
+    # optimizer = tvt.optimizer
+    optimizer_type = optim.SGD
+    optimizer = optimizer_type(model.parameters(), lr=1e-5)
     
     example, target = tvt.xtest, tvt.ytest
     pred = model(example)
@@ -133,34 +154,79 @@ if __name__=="__main__":
     print(tvt.criterion)
     
     lr0 = copy.copy(optimizer.param_groups[0]['lr'])
-    npts = 101
+    npts = 100
     lincheck = np.zeros(npts)
     angle = np.zeros(npts)
 
     span = 0.005
     step0, step1 = -span, span
     steps = np.linspace(step0, step1, npts)    
-    print('steps are', steps)
+    # print('steps are', steps)
     for i in range(npts):
         reset_model(model, sdsave, gsave)
-        
+
         step = steps[i]
         set_learning_rate(optimizer, step)
         optimizer.step()
-        
+
         loss = tvt.criterion(model(example), target)
         lincheck[i] = loss.item()
         
         optimizer.zero_grad()
         loss.backward()
-        angle[i] = grad_angle(gsave, model) # between current grad and grad in gsave
+        
+        
+        angle[i] = grad_angle(gsave, capture_gradients(model)) # between current grad and grad in gsave
     
-    plt.figure()
-    plt.plot(steps, lincheck,'-o')
+    # plt.figure()
+    # plt.plot(steps, lincheck,'-o')
     
-    plt.figure()
-    plt.plot(steps, angle, '-o')
+    # plt.figure()
+    # plt.plot(steps, angle, '-o')
     
-    plt.show()
+    # plt.show()
+    
+    # I should be able to recover the learning rate from the magnitude of the 
+    #   parameter displacement vector. Can I? 
+    
+    #
+    # Find the gradient at the current location, i.e. the one used in parameter adjusting. 
+    gnorm0sq = 0.0
+    for k, v in gsave.items():
+        gnorm0sq += torch.sum(v**2)
+    gnorm0 = torch.sqrt(gnorm0sq)
+    
+    magsteps = []
+    for s in steps:
+        reset_model(model, sdsave, gsave)
+        a0 = save_model_state(model)
+        set_learning_rate(optimizer, s)
+        optimizer.step()
+        a1 = save_model_state(model)
+        
+        normsq = 0.0
+        for k, v in model.named_parameters():
+            normsq += torch.sum((a1[k] - a0[k])**2)
+        norm = torch.sqrt(normsq)
+        magsteps.append(norm/gnorm0)    
+    
+    s = np.zeros(npts)
+    m = np.zeros(npts)
+    for i in range(npts):
+        s[i] = np.float(steps[i])
+        m[i] = np.float(magsteps[i])
+    
+    ratio = m/s
+    
+    # nprat = np.zeros(npts)
+    # for i in range(npts):
+    #     nprat[i] = np.float(ratio[i])
+        
+    print('mean ratio', np.mean(np.abs(ratio)))
+    print('std ratio', np.std(np.abs(ratio)))
+    print('correlation', np.corrcoef(np.abs(s), np.abs(m))[0,1])
+    
+    
+    
     
     
