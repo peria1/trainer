@@ -53,14 +53,14 @@ def reset_model(model, sd, g):
     for k, v in model.named_parameters():
         v.grad = copy.deepcopy(g[k])
         
-def save_model_state(model):
+def get_model_state(model):
     return copy.deepcopy(model.state_dict())
 
-def save_params(model):
-    psave = []
-    for p in model.parameters():
-        psave.append(copy.deepcopy(p))
-    return psave
+# def save_params(model):
+#     psave = []
+#     for p in model.parameters():
+#         psave.append(copy.deepcopy(p))
+#     return psave
 
 def build_gradient_vector(model):
     g = None
@@ -113,7 +113,7 @@ def grad_angle(gdict0, gdict1):
     return torch.acos(torch.clip(dot, -1.0, 1.0))*180.0/np.pi
 
 if __name__=="__main__":
-    tvt = trainer.trainer(models.n_double_nout, problems.roots_of_poly)
+    tvt = trainer.trainer(models.n_double_nout, problems.abs_fft)
     
     model = tvt.model
     # optimizer = tvt.optimizer
@@ -128,8 +128,8 @@ if __name__=="__main__":
     loss.backward()
     
     lsave = copy.copy(loss.item())
-    sdsave = save_model_state(model)
-    psave = save_params(model)
+    sdsave = get_model_state(model)
+    # psave = save_params(model)
     gsave = capture_gradients(model)
     optimizer.step()
     newpred = model(example)
@@ -159,14 +159,14 @@ if __name__=="__main__":
     angle = np.zeros(npts)
 
     span = 0.005
-    step0, step1 = -span, span
-    steps = np.linspace(step0, step1, npts)    
+    lr0, lr1 = -span, span
+    lrs = np.linspace(lr0, lr1, npts)    
     # print('steps are', steps)
     for i in range(npts):
         reset_model(model, sdsave, gsave)
 
-        step = steps[i]
-        set_learning_rate(optimizer, step)
+        lr = lrs[i]
+        set_learning_rate(optimizer, lr)
         optimizer.step()
 
         loss = tvt.criterion(model(example), target)
@@ -178,13 +178,6 @@ if __name__=="__main__":
         
         angle[i] = grad_angle(gsave, capture_gradients(model)) # between current grad and grad in gsave
     
-    # plt.figure()
-    # plt.plot(steps, lincheck,'-o')
-    
-    # plt.figure()
-    # plt.plot(steps, angle, '-o')
-    
-    # plt.show()
     
     # I should be able to recover the learning rate from the magnitude of the 
     #   parameter displacement vector. Can I? 
@@ -195,38 +188,48 @@ if __name__=="__main__":
     for k, v in gsave.items():
         gnorm0sq += torch.sum(v**2)
     gnorm0 = torch.sqrt(gnorm0sq)
-    
+    #
+    # now find the magnitude of the changes in parameters, given different learning
+    #   rates i.e. steps. 
     magsteps = []
-    for s in steps:
-        reset_model(model, sdsave, gsave)
-        a0 = save_model_state(model)
-        set_learning_rate(optimizer, s)
-        optimizer.step()
-        a1 = save_model_state(model)
+    for lr in lrs:
+        reset_model(model, sdsave, gsave)  # back to starting model. 
+        a0 = get_model_state(model)
+        set_learning_rate(optimizer, lr)
+        optimizer.step() # this takes a step of size s * gnorm0
+        a1 = get_model_state(model)
         
         normsq = 0.0
         for k, v in model.named_parameters():
             normsq += torch.sum((a1[k] - a0[k])**2)
         norm = torch.sqrt(normsq)
-        magsteps.append(norm/gnorm0)    
+        magsteps.append(norm)      # these are the steps we *observe* in parameters. 
     
     s = np.zeros(npts)
     m = np.zeros(npts)
     for i in range(npts):
-        s[i] = np.float(steps[i])
+        s[i] = np.float(lrs[i]*gnorm0.item()) # these are the putatuve SGD steps
         m[i] = np.float(magsteps[i])
     
-    ratio = m/s
+    ratio = m/s  # should be 1 if I know what's happening. 
     
-    # nprat = np.zeros(npts)
-    # for i in range(npts):
-    #     nprat[i] = np.float(ratio[i])
         
     print('mean ratio', np.mean(np.abs(ratio)))
     print('std ratio', np.std(np.abs(ratio)))
     print('correlation', np.corrcoef(np.abs(s), np.abs(m))[0,1])
+
+    numgrad = ((max(lincheck)-min(lincheck))/(max(magsteps)-min(magsteps))).item()
+    print('numerical gradient:', )
+    print('norm of grad:', gnorm0)
+    print('factor:', numgrad/gnorm0)
     
+    plt.figure()
+    plt.plot(s, lincheck,'-o')
     
+    plt.figure()
+    plt.plot(s, angle, '-o')
     
+    plt.show()
+   
     
     
