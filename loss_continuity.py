@@ -113,7 +113,7 @@ def grad_angle(gdict0, gdict1):
     return torch.acos(torch.clip(dot, -1.0, 1.0))*180.0/np.pi
 
 if __name__=="__main__":
-    tvt = trainer.trainer(models.n_double_nout, problems.abs_fft)
+    tvt = trainer.trainer(models.n_double_nout, problems.roots_of_poly)
     
     model = tvt.model
     # optimizer = tvt.optimizer
@@ -203,7 +203,7 @@ if __name__=="__main__":
         for k, v in model.named_parameters():
             normsq += torch.sum((a1[k] - a0[k])**2)
         norm = torch.sqrt(normsq)
-        magsteps.append(norm)      # these are the steps we *observe* in parameters. 
+        magsteps.append(norm*np.sign(lr))      # these are the steps we *observe* in parameters. 
     
     s = np.zeros(npts)
     m = np.zeros(npts)
@@ -219,9 +219,10 @@ if __name__=="__main__":
     print('correlation', np.corrcoef(np.abs(s), np.abs(m))[0,1])
 
     numgrad = ((max(lincheck)-min(lincheck))/(max(magsteps)-min(magsteps))).item()
-    print('numerical gradient:', )
+    print('grad vs step corr:', np.corrcoef(s, lincheck)[0,1])
+    print('numerical gradient:', numgrad )
     print('norm of grad:', gnorm0)
-    print('factor:', numgrad/gnorm0)
+    print('grad times', (numgrad/gnorm0).item(), '= numerical grad')
     
     plt.figure()
     plt.plot(s, lincheck,'-o')
