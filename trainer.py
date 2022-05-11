@@ -108,7 +108,7 @@ class trainer():
         else:
             self.criterion = nn.MSELoss()
 
-        self.optimizer_type = optim.Adam
+        self.optimizer_type = optim.SGD
         self.optimizer = self.optimizer_type(self.model.parameters(), lr=1e-5)
         self.eps = 0.001 # percent reduction in loss function at each iteration. 
         self.pause = False
@@ -134,8 +134,13 @@ class trainer():
         loss = self.criterion(pred, target)  
         loss.backward()      # Do back propagation! Thank you Pytorch!
         
-        # now get a new optimizer with the new gradient-adaptive learning rate
-        GAlr = self.eps*loss/normsq_grad(loss, self.model)
+        # now set the new gradient-adaptive learning rate
+        GAlr = self.eps*loss.item()/normsq_grad(self.model)
+        if GAlr < 0.02:
+            print('GAlr:', GAlr)
+        GAlr = min(GAlr, 0.02)
+        
+        # print()
         
         for g in self.optimizer.param_groups:
             g['lr'] = GAlr
@@ -316,7 +321,7 @@ class trainer():
         self.model.apply(weights_init)
         self.pause = state
 
-def normsq_grad(loss, model):
+def normsq_grad(model):
     absL2 = 0
     for p in model.parameters():
         absL2 += torch.sum(p.grad**2)
