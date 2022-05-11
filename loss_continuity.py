@@ -116,10 +116,8 @@ if __name__=="__main__":
     tvt = trainer.trainer(models.n_double_nout, problems.roots_of_poly)
     
     model = tvt.model
-    # optimizer = tvt.optimizer
-    optimizer_type = optim.SGD
-    optimizer = optimizer_type(model.parameters(), lr=1e-5)
-    
+    optimizer = tvt.optimizer
+   
     example, target = tvt.xtest, tvt.ytest
     pred = model(example)
     loss = tvt.criterion(pred, target)
@@ -223,6 +221,34 @@ if __name__=="__main__":
     print('numerical gradient:', numgrad )
     print('norm of grad:', gnorm0)
     print('grad times', (numgrad/gnorm0).item(), '= numerical grad')
+    
+    
+    def normsq_grad(model):
+        absL2 = 0
+        for p in model.parameters():
+            absL2 += torch.sum(p.grad**2)
+            
+        return absL2
+
+
+    tvt.eps = 1e-6
+    reset_model(model, sdsave, gsave)  # back to starting model. 
+    loss = tvt.criterion(model(example), target) # starting loss
+    # loss.backward() # do I need this here? 
+
+    saveloss = copy.copy(loss) # can't do deepcopy yet, "user-created only". Gradients don't flow to copy.
+    gradnorm = normsq_grad(model).item() # save this to check if step is right later
+
+    tvt.train_step(example, target) # model parameters updated
+    loss = tvt.criterion(model(example), target) # new loss
+    
+    print('\nNext two numbers are expected loss and current loss:')
+    print(saveloss.item() - optimizer.param_groups[0]['lr'] * gradnorm) # what we expected
+    print(loss.item())  # what we have now
+    
+    print('\n now it''s eps and realized eps:')
+    print(tvt.eps)
+    print(-(loss.item()-saveloss.item())/saveloss.item())
     
     plt.figure()
     plt.plot(s, lincheck,'-o')
