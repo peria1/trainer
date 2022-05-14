@@ -261,7 +261,7 @@ if __name__=="__main__":
     def project_dict_vector(a, b):
         factor = dot_dict_vectors(a,b)/dot_dict_vectors(b,b) 
         a_onto_b = {}
-        for k,v in a.items():
+        for k,v in b.items(): # vector nature from b
             a_onto_b.update({k : v*factor})            
         return a_onto_b
         
@@ -290,10 +290,10 @@ if __name__=="__main__":
         return ret
         
     def grad_basis(g, g1prev, g2prev):
-        xhat = normalize_dict_vector(g1prev)
+        xhat = copy.deepcopy(g1prev)
         
         ypx =  project_dict_vector(g, xhat)
-        yhat = normalize_dict_vector(subtract_dict_vector(xhat, ypx))
+        yhat = subtract_dict_vector(g, ypx)
         
         zpx = project_dict_vector(g2prev, xhat)
         zpy = project_dict_vector(g2prev, yhat)
