@@ -28,6 +28,8 @@ class trainer():
         #  class and get set up to train that instance. 
         #
         
+        self.use_GAlr = True
+        
         if not max_loss:
             max_loss = 0.0
         self.max_loss = max_loss
@@ -134,16 +136,18 @@ class trainer():
         loss = self.criterion(pred, target)  
         loss.backward()      # Do back propagation! Thank you Pytorch!
         
+        if self.use_GAlr:
         # now set the new gradient-adaptive learning rate
-        GAlr = self.eps*loss.item()/normsq_grad(self.model)
-        if GAlr < 0.02:
-            print('GAlr:', GAlr)
-        GAlr = min(GAlr, 0.02)
+            GAlr = self.eps*loss.item()/normsq_grad(self.model)
+            for g in self.optimizer.param_groups:
+                g['lr'] = GAlr
+                
+        # if GAlr < 0.02:
+        #     print('GAlr:', GAlr)
+        # GAlr = min(GAlr, 0.02)
         
         # print()
         
-        for g in self.optimizer.param_groups:
-            g['lr'] = GAlr
         self.optimizer.step()     # take one step down the gradient. 
         
         return loss.item()
