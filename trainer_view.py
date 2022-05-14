@@ -119,8 +119,8 @@ class trainer_view():
 #                    self.displays[i].active = not self.displays[i].active
         self.dispradio.on_clicked(toggle_active_display)
 
-        self.lr_ax = plt.axes([middle_edge, 0.125, width*1.5, 0.75])
-        self.lr_ax.set_xlabel('Loss vs. learning rate')
+        # self.lr_ax = plt.axes([middle_edge, 0.125, width*1.5, 0.75])
+        # self.lr_ax.set_xlabel('Loss vs. learning rate')
          
         ax_loss_box = plt.axes([text_box_left_edge, down_from_top[0], text_box_width, height]) # left, bottom, width, height
         self.loss_box = TextBox(ax_loss_box, 'Max Loss: ', \
@@ -144,12 +144,12 @@ class trainer_view():
         self.start_button.color = 'green'  # callback will toggle the color
         self.start_button.on_clicked(self.deal_with_start_button)
         
-        lrbutton = plt.axes([left_edge, down_from_top[4], width, height])
-        self.lr_button = Button(lrbutton, 'Auto LR')
-        self.lr_button.label.set_color(text_color)
-        self.lr_button.label.set_fontweight('bold')
-        self.lr_button.color = 'black'
-        self.lr_button.on_clicked(self.run_auto_lr)
+        # lrbutton = plt.axes([left_edge, down_from_top[4], width, height])
+        # self.lr_button = Button(lrbutton, 'Auto LR')
+        # self.lr_button.label.set_color(text_color)
+        # self.lr_button.label.set_fontweight('bold')
+        # self.lr_button.color = 'black'
+        # self.lr_button.on_clicked(self.run_auto_lr)
         
         dispbutton = plt.axes([left_edge, down_from_top[5], width, height])
         self.disp_button = Button(dispbutton, 'Update Displays')
@@ -179,9 +179,9 @@ class trainer_view():
         self.reset_button.color = 'black'
         self.reset_button.on_clicked(self.reset_model)
     
-    def run_auto_lr(self, event):
-        lr, L = self.trainer.auto_set_lr()
-        self.lr_ax.loglog(lr,L,'.-')
+    # def run_auto_lr(self, event):
+    #     lr, L = self.trainer.auto_set_lr()
+    #     self.lr_ax.loglog(lr,L,'.-')
 
     def reset_model(self, event):
         self.trainer.reset_model()
