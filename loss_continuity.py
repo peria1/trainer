@@ -113,7 +113,9 @@ def grad_angle(gdict0, gdict1):
     return torch.acos(torch.clip(dot, -1.0, 1.0))*180.0/np.pi
 
 if __name__=="__main__":
-    tvt = trainer.trainer(models.n_double_nout, problems.roots_of_poly)
+    
+    # npts kwarg gives degree of polynomials
+    tvt = trainer.trainer(models.n_double_nout, problems.roots_of_poly, npts=10)
     
     model = tvt.model
     optimizer = tvt.optimizer
@@ -230,33 +232,206 @@ if __name__=="__main__":
             
         return absL2
 
-
-    tvt.eps = 1e-6
-    reset_model(model, sdsave, gsave)  # back to starting model. 
-    loss = tvt.criterion(model(example), target) # starting loss
-    # loss.backward() # do I need this here? 
-
-    saveloss = copy.copy(loss) # can't do deepcopy yet, "user-created only". Gradients don't flow to copy.
-    gradnorm = normsq_grad(model).item() # save this to check if step is right later
-
-    tvt.train_step(example, target) # model parameters updated
-    loss = tvt.criterion(model(example), target) # new loss
+    def normalize_dict_vector(dv, in_place=False):
+        norm = get_norm_dict_vector(dv)
+             
+        if in_place:
+            for k, v in dv.items():
+                v /= norm
+            ret = dv
+        else:     
+            ret = {}
+            for k, v in dv.items():
+                vc = copy.deepcopy(v/norm)
+                ret.update({k : vc})
+        return ret
     
-    print('\nNext two numbers are expected loss and current loss:')
-    print(saveloss.item() - optimizer.param_groups[0]['lr'] * gradnorm) # what we expected
-    print(loss.item())  # what we have now
+    def get_norm_dict_vector(dv):
+        norm2 = 0.0
+        for k, v in dv.items():
+            norm2 += torch.sum(v**2)
+        return torch.sqrt(norm2)
+
+    def dot_dict_vectors(a,b):
+        dot_ab = 0.0
+        for k, v in a.items():
+            dot_ab += torch.sum(a[k]*b[k])
+        return dot_ab
     
-    print('\n now it''s eps and realized eps:')
-    print(tvt.eps)
-    print(-(loss.item()-saveloss.item())/saveloss.item())
+    def project_dict_vector(a, b):
+        factor = dot_dict_vectors(a,b)/dot_dict_vectors(b,b) 
+        a_onto_b = {}
+        for k,v in a.items():
+            a_onto_b.update({k : v*factor})            
+        return a_onto_b
+        
+    def subtract_dict_vector(a, b):
+        c = {}
+        for k, v in a.items():
+            c.update({k: a[k]-b[k]})
+        return c
+
+    def add_dict_vector(a, b):
+        c = {}
+        for k, v in a.items():
+            c.update({k: a[k]+b[k]})
+        return c
+
+    def rand_dict_vector(a):
+        c = {}
+        for k, v in a.items():
+            c.update({k: torch.randn_like(v)})
+        return c
+    
+    def param_dict_vector(model):
+        ret = {}
+        for k, v in model.named_parameters():
+            ret.update({k: copy.deepcopy(v)})
+        return ret
+        
+    def grad_basis(g, g1prev, g2prev):
+        xhat = normalize_dict_vector(g1prev)
+        
+        ypx =  project_dict_vector(g, xhat)
+        yhat = normalize_dict_vector(subtract_dict_vector(xhat, ypx))
+        
+        zpx = project_dict_vector(g2prev, xhat)
+        zpy = project_dict_vector(g2prev, yhat)
+        zhat = subtract_dict_vector(g2prev, add_dict_vector(zpx, zpy))
+        
+        for ehat in [xhat, yhat, zhat]:
+            normalize_dict_vector(ehat, in_place=True)
+        
+        return xhat, yhat, zhat
+
+    neps = 9
+    eps = 10**np.linspace(-8,0,neps)
+    Lratio = np.zeros(neps)
+    for i, e in enumerate(eps):
+        tvt.eps = e
+        
+        reset_model(model, sdsave, gsave)  # back to starting model. 
+        loss = tvt.criterion(model(example), target) # starting loss
+        # loss.backward() # do I need this here? 
+    
+        saveloss = copy.copy(loss) # can't do deepcopy yet, "user-created only". Gradients don't flow to copy.
+        gradnorm = normsq_grad(model).item() # save this to check if step is right later
+    
+        tvt.train_step(example, target) # model parameters updated
+        loss = tvt.criterion(model(example), target) # new loss
+        Lratio[i] = -(loss.item()-saveloss.item())/saveloss.item() # should equal e
+        
+    niter = 10000
+    loss_history = np.zeros(niter)
+    grad_history = np.zeros(niter)
+    gangle_history = np.zeros(niter)
+    step_history = np.zeros(niter)
+    sangle_hiostory = np.zeros(niter)
+    
+    vm1 = np.zeros((niter,3))
+    v0 = np.zeros((niter,3))
+    vp1 = np.zeros((niter,3))
+    xyz = np.zeros((niter, 3))
+    
+    tvt.eps = 1e-3
+    i=0
+    power_law = True
+    g0 = copy.deepcopy(gsave)
+    gp2 = rand_dict_vector(g0)
+    gp1 = rand_dict_vector(g0)
+    s0 = copy.deepcopy(sdsave)
+    reset_model(model, sdsave, gsave)
+    alpha0 = param_dict_vector(model)
+    while power_law and (i < niter):
+        if i % 100 == 0:
+            print(i,'...')
+        example, target = tvt.get_more_data()
+        loss_history[i] = tvt.train_step(example, target) # updates parameters
+        alpha1 = param_dict_vector(model)
+        
+        dalpha = subtract_dict_vector(alpha1, alpha0)
+        ehat = grad_basis(g0, gp1, gp2)
+        for j in range(3):
+            xyz[i, j] = dot_dict_vectors(ehat[j], dalpha)
+        
+        grad_history[i] = normsq_grad(model)
+        g1 = capture_gradients(tvt.model)   # copies gradients
+        gangle_history[i] = grad_angle(g0, g1)
+
+        # s1 = get_model_state()
+        # step_history[i] = normsq_step(s0, s1)
+        # g1 = capture_gradients(tvt.model)
+        # gangle_history[i] = grad_angle(g0, g1)
+        
+        
+        
+        lhi = loss_history[i]
+        power_law = np.abs(loss_history[0]*(1-tvt.eps)**i - lhi)/lhi < 0.2
+        
+        gp2, gp1, g0 = gp1, g0, g1
+        alpha0 = alpha1
+        i += 1
+        
+    istop = i
+    loss_history = loss_history[0:istop]
+    grad_history = grad_history[0:istop]
+    gangle_history = gangle_history[0:istop]
+    xyz = np.cumsum(xyz[0:istop, :], 0)
+    # sangle_history = sangle_history[0:istop]
+    
     
     plt.figure()
-    plt.plot(s, lincheck,'-o')
+    plt.plot(loss_history)
+    npow = np.round(1.33*istop)
+    plt.plot(loss_history[0]*(1-tvt.eps)**np.linspace(0,npow-1,npow))
+    plt.title('compare loss to power law')
+    plt.xlabel('iteration')
+    plt.ylabel(tvt.criterion)
+        
+    plt.figure()    
+    plt.loglog(eps, Lratio,'o-')
+    plt.loglog(eps, eps)
     
+    figg, axg = plt.subplots(3,1, sharex=True)
+    axg[0].plot(loss_history)
+    axg[0].plot(loss_history[0]*(1-tvt.eps)**np.linspace(0,npow-1,npow))
+    axg[0].set_ylabel('loss')
+    
+    axg[1].plot(grad_history)
+    axg[1].set_ylabel('grad magnitude')
+    axg[2].plot(gangle_history)
+    axg[2].set_ylabel('grad angle')
+
+    # figs, axs = plt.subplots(3,1, sharex=True)
+    # axs[0].plot(loss_history)
+    # axs[0].plot(loss_history[0]*(1-tvt.eps)**np.linspace(0,npow-1,npow))
+
+    # axs[1].plot(step_history)
+    # axs[2].plot(sangle_history)
     plt.figure()
-    plt.plot(s, angle, '-o')
+    ax = plt.axes(projection='3d')
+    ax.plot3D(xyz[:,0], xyz[:,1], xyz[:,2])
+    ax.scatter3D(xyz[0,0], xyz[0,1], xyz[0,2])
     
+    plt.ion()
     plt.show()
+
+    
+    # print('\nNext two numbers are expected loss and current loss:')
+    # print(saveloss.item() - optimizer.param_groups[0]['lr'] * gradnorm) # what we expected
+    # print(loss.item())  # what we have now
+    
+    # print('\n now it''s eps and realized eps:')
+    # print(tvt.eps)
+    # print(-(loss.item()-saveloss.item())/saveloss.item())
+    
+    # plt.figure()
+    # plt.plot(s, lincheck,'-o')
+    
+    # plt.figure()
+    # plt.plot(s, angle, '-o')
+    
+    # plt.show()
    
     
     
