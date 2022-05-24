@@ -42,16 +42,18 @@ import copy
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
-from torch import optim
+# from torch import optim
+from torch.autograd.functional import vhp as VHP
 
-def set_learning_rate(optim, lr):
-    for g in optim.param_groups:
+def set_learning_rate(optimizer, lr):
+    for g in optimizer.param_groups:
         g['lr'] = lr
 
 def reset_model(model, sd, g):
     model.load_state_dict(sd)
     for k, v in model.named_parameters():
-        v.grad = copy.deepcopy(g[k])
+        # v.grad = copy.deepcopy(g[k])
+        v.grad = g[k].clone().detach()
         
 def get_model_state(model):
     return copy.deepcopy(model.state_dict())
@@ -73,7 +75,7 @@ def build_gradient_vector(model):
     return g
  
 def capture_gradients(model):
-    return {k:copy.deepcopy(v.grad) for k,v in model.named_parameters()}
+    return {k: v.grad.clone().detach() for k,v in model.named_parameters()}
           
 
 # https://discuss.pytorch.org/t/how-to-compute-magnitude-of-gradient-of-each-loss-function/138361
@@ -111,6 +113,90 @@ def grad_angle(gdict0, gdict1):
     # print(dot.item(), torch.sqrt(norm0).item(), torch.sqrt(norm1).item())
     dot /= torch.sqrt(norm0*norm1)
     return torch.acos(torch.clip(dot, -1.0, 1.0))*180.0/np.pi
+
+def normsq_grad(model):
+    absL2 = 0
+    for p in model.parameters():
+        absL2 += torch.sum(p.grad**2)
+        
+    return absL2
+
+def normalize_dict_vector(dv, in_place=False):
+    norm = get_norm_dict_vector(dv)
+         
+    if in_place:
+        for k, v in dv.items():
+            v /= norm
+        ret = dv
+    else:     
+        ret = {}
+        for k, v in dv.items():
+            # vc = copy.deepcopy(v/norm)
+            # ret.update({k : vc})
+            ret.update({k: (v/norm).clone().detach()})
+    return ret
+
+def get_norm_dict_vector(dv):
+    norm2 = 0.0
+    for k, v in dv.items():
+        norm2 += torch.sum(v**2)
+    return torch.sqrt(norm2)
+
+def dot_dict_vectors(a,b):
+    dot_ab = 0.0
+    for k, v in a.items():
+        dot_ab += torch.sum(a[k]*b[k])
+    return dot_ab
+
+def project_dict_vector(a, b):
+    factor = dot_dict_vectors(a,b)/dot_dict_vectors(b,b) 
+    a_onto_b = {}
+    for k,v in b.items(): # vector nature from b
+        a_onto_b.update({k : v*factor})            
+    return a_onto_b
+    
+def subtract_dict_vector(a, b):
+    c = {}
+    for k, v in a.items():
+        c.update({k: a[k]-b[k]})
+    return c
+
+def add_dict_vector(a, b):
+    c = {}
+    for k, v in a.items():
+        c.update({k: a[k]+b[k]})
+    return c
+
+def rand_dict_vector(a):
+    c = {}
+    for k, v in a.items():
+        c.update({k: torch.randn_like(v)})
+    return c
+
+def param_dict_vector(model):
+    ret = {}
+    for k, v in model.named_parameters():
+        # ret.update({k: copy.deepcopy(v)})
+        ret.update({k: v.clone().detach()})
+    return ret
+    
+def grad_basis(g, g1prev, g2prev):
+    xhat = copy.deepcopy(g1prev)    # previous gradient, i.e. step just taken
+    
+    ypx =  project_dict_vector(g, xhat)
+    yhat = subtract_dict_vector(g, ypx) # perp to xhat, in plane spanned by prev 
+                                        #   and curr grad. 
+    
+    zpx = project_dict_vector(g2prev, xhat)
+    zpy = project_dict_vector(g2prev, yhat)
+    zhat = subtract_dict_vector(g2prev, add_dict_vector(zpx, zpy)) 
+    # zhat is perp to xhat and yhat...I am confused about what plane it's in. I've 
+    #   been calling it the "out-of-plane" component. 
+    
+    for ehat in [xhat, yhat, zhat]:
+        normalize_dict_vector(ehat, in_place=True)
+    
+    return xhat, yhat, zhat
 
 if __name__=="__main__":
     
@@ -225,84 +311,6 @@ if __name__=="__main__":
     print('grad times', (numgrad/gnorm0).item(), '= numerical grad')
     
     
-    def normsq_grad(model):
-        absL2 = 0
-        for p in model.parameters():
-            absL2 += torch.sum(p.grad**2)
-            
-        return absL2
-
-    def normalize_dict_vector(dv, in_place=False):
-        norm = get_norm_dict_vector(dv)
-             
-        if in_place:
-            for k, v in dv.items():
-                v /= norm
-            ret = dv
-        else:     
-            ret = {}
-            for k, v in dv.items():
-                vc = copy.deepcopy(v/norm)
-                ret.update({k : vc})
-        return ret
-    
-    def get_norm_dict_vector(dv):
-        norm2 = 0.0
-        for k, v in dv.items():
-            norm2 += torch.sum(v**2)
-        return torch.sqrt(norm2)
-
-    def dot_dict_vectors(a,b):
-        dot_ab = 0.0
-        for k, v in a.items():
-            dot_ab += torch.sum(a[k]*b[k])
-        return dot_ab
-    
-    def project_dict_vector(a, b):
-        factor = dot_dict_vectors(a,b)/dot_dict_vectors(b,b) 
-        a_onto_b = {}
-        for k,v in b.items(): # vector nature from b
-            a_onto_b.update({k : v*factor})            
-        return a_onto_b
-        
-    def subtract_dict_vector(a, b):
-        c = {}
-        for k, v in a.items():
-            c.update({k: a[k]-b[k]})
-        return c
-
-    def add_dict_vector(a, b):
-        c = {}
-        for k, v in a.items():
-            c.update({k: a[k]+b[k]})
-        return c
-
-    def rand_dict_vector(a):
-        c = {}
-        for k, v in a.items():
-            c.update({k: torch.randn_like(v)})
-        return c
-    
-    def param_dict_vector(model):
-        ret = {}
-        for k, v in model.named_parameters():
-            ret.update({k: copy.deepcopy(v)})
-        return ret
-        
-    def grad_basis(g, g1prev, g2prev):
-        xhat = copy.deepcopy(g1prev)
-        
-        ypx =  project_dict_vector(g, xhat)
-        yhat = subtract_dict_vector(g, ypx)
-        
-        zpx = project_dict_vector(g2prev, xhat)
-        zpy = project_dict_vector(g2prev, yhat)
-        zhat = subtract_dict_vector(g2prev, add_dict_vector(zpx, zpy))
-        
-        for ehat in [xhat, yhat, zhat]:
-            normalize_dict_vector(ehat, in_place=True)
-        
-        return xhat, yhat, zhat
 
     neps = 9
     eps = 10**np.linspace(-8,0,neps)
@@ -335,14 +343,14 @@ if __name__=="__main__":
     
     tvt.eps = 1e-3
     i=0
-    power_law = True
+    is_power_law = True
     g0 = copy.deepcopy(gsave)
     gp2 = rand_dict_vector(g0)
     gp1 = rand_dict_vector(g0)
     s0 = copy.deepcopy(sdsave)
     reset_model(model, sdsave, gsave)
     alpha0 = param_dict_vector(model)
-    while power_law and (i < niter):
+    while is_power_law and (i < niter):
         if i % 100 == 0:
             print(i,'...')
         example, target = tvt.get_more_data()
@@ -366,7 +374,7 @@ if __name__=="__main__":
         
         
         lhi = loss_history[i]
-        power_law = np.abs(loss_history[0]*(1-tvt.eps)**i - lhi)/lhi < 0.2
+        is_power_law = np.abs(loss_history[0]*(1-tvt.eps)**i - lhi)/lhi < 0.2
         
         gp2, gp1, g0 = gp1, g0, g1
         alpha0 = alpha1
@@ -379,11 +387,11 @@ if __name__=="__main__":
     xyz = np.cumsum(xyz[0:istop, :], 0)
     # sangle_history = sangle_history[0:istop]
     
-    
+    npow = np.round(1.33*istop)
+    power_law_pred = loss_history[0]*(1-tvt.eps)**np.linspace(0,npow-1,npow)
     plt.figure()
     plt.plot(loss_history)
-    npow = np.round(1.33*istop)
-    plt.plot(loss_history[0]*(1-tvt.eps)**np.linspace(0,npow-1,npow))
+    plt.plot(power_law_pred)
     plt.title('compare loss to power law')
     plt.xlabel('iteration')
     plt.ylabel(tvt.criterion)
@@ -394,7 +402,8 @@ if __name__=="__main__":
     
     figg, axg = plt.subplots(3,1, sharex=True)
     axg[0].plot(loss_history)
-    axg[0].plot(loss_history[0]*(1-tvt.eps)**np.linspace(0,npow-1,npow))
+    # axg[0].plot(loss_history[0]*(1-tvt.eps)**np.linspace(0,npow-1,npow))
+    axg[0].plot(power_law_pred)
     axg[0].set_ylabel('loss')
     
     axg[1].plot(grad_history)
@@ -410,13 +419,63 @@ if __name__=="__main__":
     # axs[2].plot(sangle_history)
     plt.figure()
     ax = plt.axes(projection='3d')
-    ax.plot3D(xyz[:,0], xyz[:,1], xyz[:,2])
-    ax.scatter3D(xyz[0,0], xyz[0,1], xyz[0,2])
+    ax.plot3D(xyz[:,0], xyz[:,1], xyz[:,2],'-o')
+    ax.scatter3D(xyz[0,0], xyz[0,1], xyz[0,2], 'og', s=80)
+    ax.set_xlabel('prev grad')
+    ax.set_ylabel('grad rot plane')
+    ax.set_zlabel('out of plane')
     
+    ptp = max(np.ptp(xyz[:,0]), np.ptp(xyz[:,1]), np.ptp(xyz[:,2]))
+    # ax.set_box_aspect((np.ptp(xyz[:,0]), np.ptp(xyz[:,1]), np.ptp(xyz[:,2])))
+    ax.set_box_aspect((ptp, ptp, ptp))
+
+    for item in [ax.xaxis.label,ax.yaxis.label,ax.zaxis.label]:
+        item.set_fontsize(24)    
+
+    plt.figure()
+    ax = plt.axes(projection='3d')
+    ax.plot3D(xyz[:,0], xyz[:,1], loss_history,'-o')
+    ax.plot3D(xyz[:,0], xyz[:,1], power_law_pred[0:istop],'-o')
+
+    ax.scatter3D(xyz[0,0], xyz[0,1], loss_history[0], 'og', s=80)
+    ax.set_xlabel('prev grad')
+    ax.set_ylabel('grad rot plane')
+    ax.set_zlabel('Loss')
+    # ax.set_box_aspect((np.ptp(xyz[:,0]), np.ptp(xyz[:,0]), np.ptp(loss_history)))
+
+    for item in [ax.xaxis.label,ax.yaxis.label,ax.zaxis.label]:
+        item.set_fontsize(24)    
+
+
+
+    sdnow = get_model_state(model)
+    gnow = capture_gradients(model)
+    neps = 9
+    eps = 10**np.linspace(-8,0,neps)
+    Lratio_now = np.zeros(neps)
+    for i, e in enumerate(eps):
+        tvt.eps = e
+        
+        reset_model(model, sdnow, gnow)  # back to starting model. 
+        loss = tvt.criterion(model(example), target) # starting loss
+        # loss.backward() # do I need this here? 
+    
+        saveloss = copy.copy(loss) # can't do deepcopy yet, "user-created only". Gradients don't flow to copy.
+        gradnorm = normsq_grad(model).item() # save this to check if step is right later
+    
+        tvt.train_step(example, target) # model parameters updated
+        loss = tvt.criterion(model(example), target) # new loss
+        Lratio_now[i] = -(loss.item()-saveloss.item())/saveloss.item() # should equal e
+
+
     plt.ion()
     plt.show()
 
-    
+    # func, inputs, v
+    # mpars = tuple([p for p in model.parameters()])
+    # func = lambda mpars : loss
+    # alpha_H = VHP(func, mpars, v=mpars, strict=True)
+
     # print('\nNext two numbers are expected loss and current loss:')
     # print(saveloss.item() - optimizer.param_groups[0]['lr'] * gradnorm) # what we expected
     # print(loss.item())  # what we have now
