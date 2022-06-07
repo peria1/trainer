@@ -198,6 +198,12 @@ def grad_basis(g, g1prev, g2prev):
     
     return xhat, yhat, zhat
 
+def count_params(model):
+    count = 0
+    for p in model.parameters():
+        count += np.prod(p.shape)
+    return count
+
 if __name__=="__main__":
     
     # npts kwarg gives degree of polynomials
@@ -350,6 +356,7 @@ if __name__=="__main__":
     s0 = copy.deepcopy(sdsave)
     reset_model(model, sdsave, gsave)
     alpha0 = param_dict_vector(model)
+    print('Training model with', count_params(model), 'parameters.')
     while is_power_law and (i < niter):
         if i % 100 == 0:
             print(i,'...')
