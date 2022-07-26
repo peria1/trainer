@@ -128,7 +128,7 @@ class trainer():
 
         self.zap_history()        
 
-    def train_step(self, input, target):
+    def train_step(self, input, target, linearize=False):
         self.model.train()  # make sure model is in training mode
         
         self.optimizer.zero_grad()  # Make the gradients zero to start the step.

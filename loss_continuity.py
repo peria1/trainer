@@ -43,7 +43,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 # from torch import optim
-from torch.autograd.functional import vhp as VHP
+# from torch.autograd.functional import vhp as VHP
+
+def linear_step(optimizer):
+    optimizer.step()
 
 def set_learning_rate(optimizer, lr):
     for g in optimizer.param_groups:
@@ -64,7 +67,7 @@ def get_model_state(model):
 #         psave.append(copy.deepcopy(p))
 #     return psave
 
-def build_gradient_vector(model):
+def build_gradient_vector(model): # not a dict vector, a 1D tensor
     g = None
     for p in model.parameters():
         pcpu = p.grad.flatten().detach().cpu()
@@ -99,7 +102,7 @@ def capture_gradients(model):
 # array([[ 1.        , -0.99981265],
 #        [-0.99981265,  1.        ]])
 
-def grad_angle(gdict0, gdict1):
+def dict_vect_angle(gdict0, gdict1): # between 2 dict vects, radians
     dot = 0.0
     norm0 = 0.0
     norm1 = 0.0
@@ -110,9 +113,8 @@ def grad_angle(gdict0, gdict1):
         norm0 += torch.sum(g0**2)
         norm1 += torch.sum(g1**2)
     
-    # print(dot.item(), torch.sqrt(norm0).item(), torch.sqrt(norm1).item())
     dot /= torch.sqrt(norm0*norm1)
-    return torch.acos(torch.clip(dot, -1.0, 1.0))*180.0/np.pi
+    return torch.acos(torch.clip(dot, -1.0, 1.0))
 
 def normsq_grad(model):
     absL2 = 0
@@ -120,6 +122,9 @@ def normsq_grad(model):
         absL2 += torch.sum(p.grad**2)
         
     return absL2
+
+def vH(v, model):
+    pass
 
 def normalize_dict_vector(dv, in_place=False):
     norm = get_norm_dict_vector(dv)
@@ -131,8 +136,6 @@ def normalize_dict_vector(dv, in_place=False):
     else:     
         ret = {}
         for k, v in dv.items():
-            # vc = copy.deepcopy(v/norm)
-            # ret.update({k : vc})
             ret.update({k: (v/norm).clone().detach()})
     return ret
 
@@ -173,7 +176,7 @@ def rand_dict_vector(a):
         c.update({k: torch.randn_like(v)})
     return c
 
-def param_dict_vector(model):
+def param_dict_vector(model): # current model position as dict vector
     ret = {}
     for k, v in model.named_parameters():
         # ret.update({k: copy.deepcopy(v)})
@@ -268,7 +271,7 @@ if __name__=="__main__":
         loss.backward()
         
         
-        angle[i] = grad_angle(gsave, capture_gradients(model)) # between current grad and grad in gsave
+        angle[i] = dict_vect_angle(gsave, capture_gradients(model)) # between current grad and grad in gsave
     
     
     # I should be able to recover the learning rate from the magnitude of the 
@@ -316,8 +319,12 @@ if __name__=="__main__":
     print('norm of grad:', gnorm0)
     print('grad times', (numgrad/gnorm0).item(), '= numerical grad')
     
+    try: 
+        assert(tvt.use_GAlr)
+    except AssertionError:
+        print('Oops, you turned off gradient-adaptive stepping...')
+        raise AssertionError
     
-
     neps = 9
     eps = 10**np.linspace(-8,0,neps)
     Lratio = np.zeros(neps)
@@ -361,7 +368,7 @@ if __name__=="__main__":
         if i % 100 == 0:
             print(i,'...')
         example, target = tvt.get_more_data()
-        loss_history[i] = tvt.train_step(example, target) # updates parameters
+        loss_history[i] = tvt.train_step(example, target, linearize=False) # updates parameters
         alpha1 = param_dict_vector(model)
         
         dalpha = subtract_dict_vector(alpha1, alpha0)
@@ -371,12 +378,12 @@ if __name__=="__main__":
         
         grad_history[i] = normsq_grad(model)
         g1 = capture_gradients(tvt.model)   # copies gradients
-        gangle_history[i] = grad_angle(g0, g1)
+        gangle_history[i] = dict_vect_angle(g0, g1)
 
         # s1 = get_model_state()
         # step_history[i] = normsq_step(s0, s1)
         # g1 = capture_gradients(tvt.model)
-        # gangle_history[i] = grad_angle(g0, g1)
+        # gangle_history[i] = dict_vect_angle(g0, g1)
         
         
         
@@ -403,9 +410,13 @@ if __name__=="__main__":
     plt.xlabel('iteration')
     plt.ylabel(tvt.criterion)
         
-    plt.figure()    
+    plt.figure()   
     plt.loglog(eps, Lratio,'o-')
     plt.loglog(eps, eps)
+    plt.title('Compare actual loss change to goal')
+    plt.xlabel('desired change')
+    plt.ylabel('measured change')
+
     
     figg, axg = plt.subplots(3,1, sharex=True)
     axg[0].plot(loss_history)
