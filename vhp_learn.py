@@ -113,6 +113,7 @@ def objective(X):
 #
 # Sadly it contains some global variables. 
 def loss_wrt_params(*new_params):
+    print('Entering loss_wrt_params...', flush=True)
     load_weights(mlp, names, new_params) # Weird! We removed the params before. 
     if len(tuple(mlp.named_parameters())) == 0:
         print('Model has no parameters!')
@@ -121,41 +122,40 @@ def loss_wrt_params(*new_params):
             print('whoops p is None!')
         else:
             print(n,p)
+            
     out = mlp(xglobal)  # model output
     loss = objective(out)  # comparing model to ground truth, in practice. 
     
     loss.backward(retain_graph=True)
     return loss
 
-
-
-
 if __name__ == "__main__":
+    print('Here we go...just defs to start')
     # your model instantiation
     in_dim, out_dim = 3, 2
     mlp = SimpleMLP(in_dim, out_dim)
-    
-    v_to_dot = tuple([torch.rand_like(p.clone().detach()) for p in mlp.parameters()])
+    # print('back from mlp def...')
+    # v_to_dot = tuple([torch.rand_like(p.clone().detach()) for p in mlp.parameters()])
+    v_to_dot = tuple([torch.ones_like(p.clone().detach()) for p in mlp.parameters()])
     
     xglobal = torch.rand((in_dim,)) # need to eliminate this and other global refs. 
-    
-    
     
     orig_params, orig_grad, names = make_functional(mlp)
     params2pass = tuple(p.detach().requires_grad_() for p in orig_params)
     
-    
-    
+    print('computing loss and vH...')
+    # 
     loss_value, v_dot_hessian = \
         torch.autograd.functional.vhp(loss_wrt_params,
                                       params2pass,
                                       v_to_dot, strict=True)
-
+    print('back from loss and vH...')
     restore_model(mlp, names, orig_params, orig_grad)
+    
+    print('Computing loss to compare with previous...')
     lossp = loss_wrt_params(*orig_params) # this calls backward on loss = objective(out)
     grad = capture_gradients(mlp)
     print('grad is:', grad)
-    # print('dLdY check is:', torch.sum())
     
     print('loss_value:', loss_value)
     print('lossp:', lossp)
