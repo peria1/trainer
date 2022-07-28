@@ -134,6 +134,8 @@ if __name__ == "__main__":
     # your model instantiation
     in_dim, out_dim = 3, 2
     mlp = SimpleMLP(in_dim, out_dim)
+    
+    mlpsave = copy.deepcopy(mlp)
     # print('back from mlp def...')
     # v_to_dot = tuple([torch.rand_like(p.clone().detach()) for p in mlp.parameters()])
     v_to_dot = tuple([torch.ones_like(p.clone().detach()) for p in mlp.parameters()])
@@ -141,6 +143,10 @@ if __name__ == "__main__":
     xglobal = torch.rand((in_dim,)) # need to eliminate this and other global refs. 
     
     orig_params, orig_grad, names = make_functional(mlp)
+    
+    mlpbroken = copy.deepcopy(mlp)
+    
+    
     params2pass = tuple(p.detach().requires_grad_() for p in orig_params)
     
     print('computing loss and vH...')
