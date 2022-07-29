@@ -19,27 +19,27 @@ torch.manual_seed(0)
 #
 # borrowed from the link I posted in comment
 # 
-def del_attr(obj, names): # why, why, why? But it definitely breaks without this. 
-    if len(names) == 1:
+def del_attr(obj, names_split): # why, why, why? But it definitely breaks without this. 
+    if len(names_split) == 1:
 #         print('BEFORE:')
 #         print([n for n,p in obj.named_parameters()])
-        delattr(obj, names[0])
+        delattr(obj, names_split[0])
 #         print('AFTER:')
 #         print([n for n,p in obj.named_parameters()])
     else:
-#         print('recursing',len(names))
-        del_attr(getattr(obj, names[0]), names[1:])
+#         print('recursing',len(names_split))
+        del_attr(getattr(obj, names_split[0]), names_split[1:])
 
-def set_attr(obj, names, val):
-    if len(names) == 1:
+def set_attr(obj, names_split, val):
+    if len(names_split) == 1:
 #         print('BEFORE:')
 #         print([n for n,p in obj.named_parameters()])
-        setattr(obj, names[0], val)
+        setattr(obj, names_split[0], val)
 #         print('AFTER:')
 #         print([n for n,p in obj.named_parameters()])
     else:
-#         print('recursing',len(names))
-        set_attr(getattr(obj, names[0]), names[1:], val)
+#         print('recursing',len(names_split))
+        set_attr(getattr(obj, names_split[0]), names_split[1:], val)
 
 def make_functional(model):
     orig_params = tuple(model.parameters())
@@ -88,6 +88,48 @@ def sigprime(x):
 def invsigmoid(x):
     return -torch.log(1/x-1)
     
+def max_vect_comp(x, maxabs=False):
+    fmax = lambda x : torch.max(torch.abs(x)) if maxabs else torch.max(x)
+    maxv = None
+    try:
+        for xi in x:
+            imax = fmax(xi)
+            if not maxv or maxv < imax:
+                maxv = imax
+    except TypeError:
+        maxv = fmax(x)
+        
+    return maxv
+
+def scale_vect(x,a):
+    try:
+        for xi in x:
+            xi /= a
+    except TypeError:
+        x /= a
+            
+def norm_vect(x):
+    scale_vect(x, torch.sqrt(dot_vect(x,x)))
+
+def dot_vect(a,b):
+    adotb = 0.0
+    try:
+        for ai,bi in zip(a,b):
+            assert(ai.shape == bi.shape)
+            adotb += torch.sum(ai*bi)            
+    except TypeError:
+        assert(a.shape==b.shape)
+        adotb += torch.sum(a*b)
+    except AssertionError:
+        print('OOPS!', a.shape, b.shape)
+        adotb = None
+    return adotb
+
+def angle_vect(a,b):
+    cos_ab = dot_vect(a,b)/torch.sqrt(dot_vect(a,a)*dot_vect(b,b))
+    
+    return torch.acos(cos_ab)
+    
 
 # your simple MLP model
 class SimpleMLP(nn.Module):
@@ -132,7 +174,7 @@ def loss_wrt_params(*new_params):
 if __name__ == "__main__":
     print('Here we go...just defs to start')
     # your model instantiation
-    in_dim, out_dim = 3, 2
+    in_dim, out_dim = 30, 20
     mlp = SimpleMLP(in_dim, out_dim)
     
     mlpsave = copy.deepcopy(mlp)
@@ -155,16 +197,30 @@ if __name__ == "__main__":
         torch.autograd.functional.vhp(loss_wrt_params,
                                       params2pass,
                                       v_to_dot, strict=True)
-    print('back from loss and vH...')
-    restore_model(mlp, names, orig_params, orig_grad)
+    # print('back from loss and vH...')
+    # restore_model(mlp, names, orig_params, orig_grad)
     
-    print('Computing loss to compare with previous...')
-    lossp = loss_wrt_params(*orig_params) # this calls backward on loss = objective(out)
-    grad = capture_gradients(mlp)
-    print('grad is:', grad)
+    # print('Computing loss to compare with previous...')
+    # lossp = loss_wrt_params(*orig_params) # this calls backward on loss = objective(out)
+    # grad = capture_gradients(mlp)
+    # print('grad is:', grad)
     
-    print('loss_value:', loss_value)
-    print('lossp:', lossp)
-    print('vH(params):', v_dot_hessian)
+    # print('loss_value:', loss_value)
+    # print('lossp:', lossp)
+    # print('vH(params):', v_dot_hessian)
 
+    vnext = copy.deepcopy(v_dot_hessian)
+    while True:
+        scale_vect(vnext, max_vect_comp(vnext, maxabs=True))
+        vprev = vnext
+        _, vnext = \
+            torch.autograd.functional.vhp(loss_wrt_params,
+                                          params2pass,
+                                          vnext, strict=True)
+        if (dtht := angle_vect(vnext, vprev)) < 0.0001:
+            break
+        else:
+            print(dtht)
+        
+        
 #
