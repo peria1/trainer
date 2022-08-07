@@ -185,7 +185,7 @@ def loss_wrt_params(*new_params):
 
 if __name__ == "__main__":
     
-    torch.manual_seed(0)
+    # torch.manual_seed(0)
 
     
     print('Here we go...just defs to start')
@@ -231,7 +231,7 @@ if __name__ == "__main__":
     vnext = copy.deepcopy(v_dot_hessian)
     while True:
         scale_vect(vnext, max_vect_comp(vnext, maxabs=True))
-        vprev = vnext
+        vprev = copy.deepcopy(vnext) # maybe unnecessary, vhp makes a new copy
         _, vnext = \
             torch.autograd.functional.vhp(loss_wrt_params,
                                           params2pass,
@@ -243,5 +243,10 @@ if __name__ == "__main__":
             # print(dtht.item())
             pass
         
-        
-#
+    grad_tuple = dict_to_tuple(gradfirst)
+    print("eigenvector is", vnext)
+    print('angle with gradient is', \
+          angle_vect(grad_tuple, vnext)*180/3.14,'degrees.')
+    lambda_max = torch.sqrt(dot_vect(vnext, vnext)/ \
+                            dot_vect(vprev, vprev)).item()
+    print('Largest eigenvalue is', lambda_max)
