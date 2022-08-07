@@ -12,7 +12,6 @@ from torch.autograd.functional import vhp
 import copy
 import numpy as np
 
-torch.manual_seed(0)
 
 # Following are utilities to make nn.Module "functional", in the sense of 
 #    being from or compatible with the torch.autograd.functional library. 
@@ -130,6 +129,11 @@ def angle_vect(a,b):
     
     return torch.acos(cos_ab)
     
+def dict_to_tuple(d):
+    t = []
+    for k,v in d.items():
+        t.append(v)
+    return tuple(t)
 
 # your simple MLP model
 class SimpleMLP(nn.Module):
@@ -153,12 +157,20 @@ def objective(X):
 
 # This is how we trick vhp into doing the Hessian with respect to params and not other inputs.
 #
-# Sadly it contains some global variables. 
+# Sadly it contains some global variables. For example, mlp. Hoo boy. All the
+#   stuff I do here trying to copy and preserve the model so I can look at the
+#   gradient later goes down the toilet here because "mlp" is actually a 
+#   global reference. Ok. Ok. So there is no way to call loss on anything but
+#   the copy of the model named mlp. So to preserve the gradient vector at the
+#   original point, I need to call this function and then capture the 
+#   gradients right away. Ok. 
 def loss_wrt_params(*new_params):
-    print('Entering loss_wrt_params...', flush=True)
+    # print('Entering loss_wrt_params...', flush=True)
     load_weights(mlp, names, new_params) # Weird! We removed the params before. 
+    # load_weights(mlp, names, new_params, as_params=True) # Weird! We removed the params before. 
     if len(tuple(mlp.named_parameters())) == 0:
-        print('Model has no parameters!')
+        # print('Model has no parameters!')
+        pass
     for n,p in mlp.named_parameters():
         if p is None:
             print('whoops p is None!')
@@ -172,12 +184,16 @@ def loss_wrt_params(*new_params):
     return loss
 
 if __name__ == "__main__":
+    
+    torch.manual_seed(0)
+
+    
     print('Here we go...just defs to start')
     # your model instantiation
-    in_dim, out_dim = 30, 20
-    mlp = SimpleMLP(in_dim, out_dim)
+    in_dim, out_dim = 3, 2
+    mlp = SimpleMLP(in_dim, out_dim) # this is the global reference
     
-    mlpsave = copy.deepcopy(mlp)
+    mlpsave = copy.deepcopy(mlp) # pointless until gradients are loaded
     # print('back from mlp def...')
     # v_to_dot = tuple([torch.rand_like(p.clone().detach()) for p in mlp.parameters()])
     v_to_dot = tuple([torch.ones_like(p.clone().detach()) for p in mlp.parameters()])
@@ -185,18 +201,21 @@ if __name__ == "__main__":
     xglobal = torch.rand((in_dim,)) # need to eliminate this and other global refs. 
     
     orig_params, orig_grad, names = make_functional(mlp)
-    
-    mlpbroken = copy.deepcopy(mlp)
-    
-    
+        
     params2pass = tuple(p.detach().requires_grad_() for p in orig_params)
     
     print('computing loss and vH...')
     # 
+    
+    lossfirst = loss_wrt_params(*orig_params)
+    gradfirst = capture_gradients(mlp)
+    mlp = copy.deepcopy(mlpsave)
+    orig_params, orig_grad, names = make_functional(mlp)
     loss_value, v_dot_hessian = \
         torch.autograd.functional.vhp(loss_wrt_params,
                                       params2pass,
                                       v_to_dot, strict=True)
+        
     # print('back from loss and vH...')
     # restore_model(mlp, names, orig_params, orig_grad)
     
@@ -217,10 +236,12 @@ if __name__ == "__main__":
             torch.autograd.functional.vhp(loss_wrt_params,
                                           params2pass,
                                           vnext, strict=True)
-        if (dtht := angle_vect(vnext, vprev)) < 0.0001:
+        dtht = angle_vect(vnext, vprev)
+        if dtht < 0.0001:
             break
         else:
-            print(dtht)
+            # print(dtht.item())
+            pass
         
         
 #
