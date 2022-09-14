@@ -8,7 +8,7 @@ Created on Tue Jul 26 14:21:49 2022
 
 import torch
 from torch import nn
-from torch.autograd.functional import vhp
+# from torch.autograd.functional import vhp as agf_vhp
 import copy
 import numpy as np
 
@@ -60,8 +60,9 @@ def load_weights(model, names, params, as_params=False):
 def restore_model(model, names, params, grad): # (this one is mine)
     load_weights(model, names, params, as_params=True)
     for k, v in model.named_parameters():
-        if grad[k+'.grad']:
-            v.grad = grad[k].clone().detach()
+        kg = k + '.grad'
+        if grad[kg] is not None:
+            v.grad = grad[kg].clone().detach()
         else:
             v.grad = None
 
@@ -100,14 +101,14 @@ def max_vect_comp(x, maxabs=False):
         
     return maxv
 
-def scale_vect(x,a):
+def scale_vect(x,a):  # IN-PLACE!! Returns None...
     try:
         for xi in x:
             xi /= a
     except TypeError:
         x /= a
             
-def norm_vect(x):
+def norm_vect(x):  # IN-PLACE!! Returns None...
     scale_vect(x, torch.sqrt(dot_vect(x,x)))
 
 def dot_vect(a,b):
@@ -123,6 +124,7 @@ def dot_vect(a,b):
         print('OOPS!', a.shape, b.shape)
         adotb = None
     return adotb
+   
 
 def angle_vect(a,b):
     cos_ab = dot_vect(a,b)/torch.sqrt(dot_vect(a,a)*dot_vect(b,b))
@@ -182,6 +184,43 @@ def loss_wrt_params(*new_params):
     
     loss.backward(retain_graph=True)
     return loss
+"""
+class Hessian(): # looking for a way to encapsulate the global context, since
+                    # the global context makes the toy example unusable. 
+    def __init__(self, objective, model, input_data, v= None):
+        self.vhp = None
+        self.model = copy.deepcopy(model)
+        self.input_data = input_data
+        self.prediction = self.model(input_data)
+        self.objective = objective
+        
+        
+        if v is None:
+            pass
+            # self.v_to_dot = [torch.ones_like(vi) for vi in 
+        
+    
+    def get_vhp(self):
+        
+        loss_value, v_dot_hessian = \
+            torch.autograd.functional.vhp(loss_wrt_params,
+                                          params2pass,
+                                          v_to_dot, strict=True)
+            
+        return v_dot_hessian
+    
+    def loss_wrt_params(self, *new_params):
+        load_weights(self.model, names, new_params) 
+        if len(tuple(self.model.named_parameters())) == 0:
+            print('Hessian: Model has no parameters!')
+            pass
+                
+        out = self.model(self.input_data)  # model output
+        loss = self.objective(out)  # comparing model to ground truth, in practice. 
+        
+        loss.backward(retain_graph=True)
+        return loss
+"""
 
 if __name__ == "__main__":
     
@@ -208,6 +247,7 @@ if __name__ == "__main__":
     # 
     
     lossfirst = loss_wrt_params(*orig_params)
+    print('lossfirst is', lossfirst.item())
     gradfirst = capture_gradients(mlp)
     mlp = copy.deepcopy(mlpsave)
     orig_params, orig_grad, names = make_functional(mlp)
@@ -231,7 +271,7 @@ if __name__ == "__main__":
     vnext = copy.deepcopy(v_dot_hessian)
     while True:
         scale_vect(vnext, max_vect_comp(vnext, maxabs=True))
-        vprev = copy.deepcopy(vnext) # maybe unnecessary, vhp makes a new copy
+        vprev = copy.deepcopy(vnext) # maybe unnecessary, agf_vhp makes a new copy
         _, vnext = \
             torch.autograd.functional.vhp(loss_wrt_params,
                                           params2pass,
@@ -245,8 +285,57 @@ if __name__ == "__main__":
         
     grad_tuple = dict_to_tuple(gradfirst)
     print("eigenvector is", vnext)
-    print('angle with gradient is', \
-          angle_vect(grad_tuple, vnext)*180/3.14,'degrees.')
+    print('angle between eigenvector and gradient is', \
+          int(angle_vect(grad_tuple, vnext)*180/np.pi),'degrees.')
+        
     lambda_max = torch.sqrt(dot_vect(vnext, vnext)/ \
                             dot_vect(vprev, vprev)).item()
-    print('Largest eigenvalue is', lambda_max)
+    print('Largest eigenvalue of the Hessian is', lambda_max)
+
+    gradmag = torch.sqrt(dot_vect(grad_tuple, grad_tuple)).item()
+    print('gradient magnitude is', gradmag)
+    
+    vhpmag = torch.sqrt(dot_vect(vnext, vnext)).item()
+    print('VHP magnitude is', vhpmag)
+    
+    
+    vunit = copy.deepcopy(vnext)
+    norm_vect(vunit)
+    _, vuH = \
+        torch.autograd.functional.vhp(loss_wrt_params,
+                                      params2pass,
+                                      vunit, strict=True)
+    
+    fpp = torch.sqrt(dot_vect(vuH, vuH))    
+    # this is the step size, in the vunit direction, that should bring 
+    #   the gradient magnitude to zero. 
+    scale = gradmag/fpp  
+    
+    model = mlp
+    # load_weights(model, names, orig_params, as_params=False)
+    restore_model(model, names, orig_params, gradfirst)
+    optimizer = torch.optim.SGD(model.parameters(), lr=1e-3)
+    
+    loss0 = loss_value
+    print('Initial loss ', loss0.item())
+   
+    optimizer.step()
+
+    # Get updated loss
+    out1 = model(xglobal)
+    loss1 = objective(out1)
+    print('Updated loss ', loss1.item())
+
+    # Use negative lr to revert loss
+    optimizer.param_groups[0]['lr'] = -1. * optimizer.param_groups[0]['lr']
+    
+    optimizer.step()
+    out2 = model(xglobal)
+    loss2 = objective(out2)
+    print('Reverted loss ', loss2.item())
+    
+    
+    
+    
+    
+    
