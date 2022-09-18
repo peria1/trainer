@@ -232,9 +232,6 @@ if __name__ == "__main__":
     in_dim, out_dim = 3, 2
     mlp = SimpleMLP(in_dim, out_dim) # this is the global reference
     
-    mlpsave = copy.deepcopy(mlp) # pointless until gradients are loaded
-    # print('back from mlp def...')
-    # v_to_dot = tuple([torch.rand_like(p.clone().detach()) for p in mlp.parameters()])
     v_to_dot = tuple([torch.ones_like(p.clone().detach()) for p in mlp.parameters()])
     
     xglobal = torch.rand((in_dim,)) # need to eliminate this and other global refs. 
@@ -249,7 +246,7 @@ if __name__ == "__main__":
     lossfirst = loss_wrt_params(*orig_params)
     print('lossfirst is', lossfirst.item())
     gradfirst = capture_gradients(mlp)
-    mlp = copy.deepcopy(mlpsave)
+    # mlp = copy.deepcopy(mlpsave)
     orig_params, orig_grad, names = make_functional(mlp)
     loss_value, v_dot_hessian = \
         torch.autograd.functional.vhp(loss_wrt_params,
