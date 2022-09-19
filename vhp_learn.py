@@ -244,7 +244,9 @@ if __name__ == "__main__":
     # 
     
     lossfirst = loss_wrt_params(*orig_params)
-    print('lossfirst is', lossfirst.item())
+    print('lossfirst (via params) is', lossfirst.item())
+    losscheck = objective(mlp(xglobal))
+    print('loss via input is', losscheck.item())
     gradfirst = capture_gradients(mlp)
     # mlp = copy.deepcopy(mlpsave)
     orig_params, orig_grad, names = make_functional(mlp)
@@ -265,10 +267,11 @@ if __name__ == "__main__":
     # print('lossp:', lossp)
     # print('vH(params):', v_dot_hessian)
 
-    vnext = copy.deepcopy(v_dot_hessian)
+    vnext = copy.deepcopy(v_dot_hessian) # want to save v_dot_hessian
     while True:
         scale_vect(vnext, max_vect_comp(vnext, maxabs=True))
-        vprev = copy.deepcopy(vnext) # maybe unnecessary, agf_vhp makes a new copy
+        # vprev = copy.deepcopy(vnext) # maybe unnecessary, agf_vhp makes a new copy
+        vprev = vnext
         _, vnext = \
             torch.autograd.functional.vhp(loss_wrt_params,
                                           params2pass,
@@ -305,13 +308,17 @@ if __name__ == "__main__":
     
     fpp = torch.sqrt(dot_vect(vuH, vuH))    
     # this is the step size, in the vunit direction, that should bring 
-    #   the gradient magnitude to zero. 
+    #   the gradient magnitude to zero, if the gradient varies linearly. 
+    # It's delta_x = y_now/slope...a step that big should bring y to zero. 
     scale = gradmag/fpp  
+    print('Expect zero gradient after step of',scale.item())
     
-    model = mlp
-    # load_weights(model, names, orig_params, as_params=False)
-    restore_model(model, names, orig_params, gradfirst)
-    optimizer = torch.optim.SGD(model.parameters(), lr=1e-3)
+    
+    # The following shows that I can step and then step back, with plain
+    #   SGD. This is stepping along the gradient though, not in the max
+    #   eigen direction. 
+    restore_model(mlp, names, orig_params, gradfirst)
+    optimizer = torch.optim.SGD(mlp.parameters(), lr=1e-3)
     
     loss0 = loss_value
     print('Initial loss ', loss0.item())
@@ -319,7 +326,7 @@ if __name__ == "__main__":
     optimizer.step()
 
     # Get updated loss
-    out1 = model(xglobal)
+    out1 = mlp(xglobal)
     loss1 = objective(out1)
     print('Updated loss ', loss1.item())
 
@@ -327,7 +334,7 @@ if __name__ == "__main__":
     optimizer.param_groups[0]['lr'] = -1. * optimizer.param_groups[0]['lr']
     
     optimizer.step()
-    out2 = model(xglobal)
+    out2 = mlp(xglobal)
     loss2 = objective(out2)
     print('Reverted loss ', loss2.item())
     
