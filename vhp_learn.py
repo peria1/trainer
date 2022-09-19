@@ -242,12 +242,21 @@ if __name__ == "__main__":
     
     print('computing loss and vH...')
     # 
-    
+    print('len(tuple(parameters)) is', len(tuple(mlp.parameters())))
+    for p in mlp.parameters():
+        print('1: p is',p)
+        if p is None:
+            print('OMG')
+        print('1:p.grad is', p.grad, flush=True)
     lossfirst = loss_wrt_params(*orig_params)
+    for p in mlp.parameters():
+        print('2:p.grad is', p.grad)
+
+    gradfirst = capture_gradients(mlp)
+
     print('lossfirst (via params) is', lossfirst.item())
     losscheck = objective(mlp(xglobal))
     print('loss via input is', losscheck.item())
-    gradfirst = capture_gradients(mlp)
     # mlp = copy.deepcopy(mlpsave)
     orig_params, orig_grad, names = make_functional(mlp)
     loss_value, v_dot_hessian = \
@@ -270,7 +279,6 @@ if __name__ == "__main__":
     vnext = copy.deepcopy(v_dot_hessian) # want to save v_dot_hessian
     while True:
         scale_vect(vnext, max_vect_comp(vnext, maxabs=True))
-        # vprev = copy.deepcopy(vnext) # maybe unnecessary, agf_vhp makes a new copy
         vprev = vnext
         _, vnext = \
             torch.autograd.functional.vhp(loss_wrt_params,
