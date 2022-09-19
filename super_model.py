@@ -9,7 +9,8 @@ Trying to encapsulate the stuff in vhp_learn.py into a superclass of a
     
 @author: Bill
 """
-
+import copy
+import numpy as np
 import torch
 from torch import nn
 
@@ -17,42 +18,99 @@ class SuperModel(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__()
         self.register_forward_pre_hook(store_input)
-        for name, p in list(self.named_parameters()):
-            print(name)
+        self.is_functional = False
                    
     def set_criterion(self, objective):
         self.objective = objective
         
     def max_eigen_H(self):
+        
+        # lossfirst = self.loss_wrt_params(*self.orig_params)
+        gradfirst = self.capture_gradients()
+        v_to_dot = tuple([torch.ones_like(p.clone().detach()) \
+                          for p in self.parameters()])
 
-        lossfirst = loss_wrt_params(*orig_params)
-        gradfirst = capture_gradients(self)
-        mlp = copy.deepcopy(mlpsave)
-        orig_params, orig_grad, names = make_functional(mlp)
+        if not self.is_functional:
+            self.make_functional()
+
+        params2pass = tuple(p.detach().requires_grad_() for p in self.orig_params)
+
+# For some reason, v_to_dot comes out empty so far. Why? What state is 
+#   the model in? 
+
+        # mlp = copy.deepcopy(mlpsave)
+        print('v_to_dot',v_to_dot)
+
         loss_value, v_dot_hessian = \
-            torch.autograd.functional.vhp(loss_wrt_params,
+            torch.autograd.functional.vhp(self.loss_wrt_params,
                                           params2pass,
                                           v_to_dot, strict=True)
+            
+        vnext = copy.deepcopy(v_dot_hessian)
+        while True:
+            scale_vect(vnext, max_vect_comp(vnext, maxabs=True))
+            vprev = copy.deepcopy(vnext) # maybe unnecessary, agf_vhp makes a new copy
+            _, vnext = \
+                torch.autograd.functional.vhp(self.loss_wrt_params,
+                                              params2pass,
+                                              vnext, strict=True)
+            dtht = angle_vect(vnext, vprev)
+            if dtht < 0.0001:
+                break
+            else:
+                # print(dtht.item())
+                pass
+            
+        grad_tuple = dict_to_tuple(gradfirst)
+        print("eigenvector is", vnext)
+        print('angle between eigenvector and gradient is', \
+              int(angle_vect(grad_tuple, vnext)*180/np.pi),'degrees.')
+            
+        lambda_max = torch.sqrt(dot_vect(vnext, vnext)/ \
+                                dot_vect(vprev, vprev)).item()
+        print('Largest eigenvalue of the Hessian is', lambda_max)
+
+        gradmag = torch.sqrt(dot_vect(grad_tuple, grad_tuple)).item()
+        print('gradient magnitude is', gradmag)
+        
+        vhpmag = torch.sqrt(dot_vect(vnext, vnext)).item()
+        print('VHP magnitude is', vhpmag)
+        
+        
+        vunit = copy.deepcopy(vnext)
+        norm_vect(vunit)
+        _, vuH = \
+            torch.autograd.functional.vhp(self.loss_wrt_params,
+                                          params2pass,
+                                          vunit, strict=True)
+        
+        fpp = torch.sqrt(dot_vect(vuH, vuH))    
+        # this is the step size, in the vunit direction, that should bring 
+        #   the gradient magnitude to zero. 
+        scale = gradmag/fpp  
+        print('scale is', scale)
+
+    
     
     def make_functional(self):
-        model = self
-        orig_params = tuple(model.parameters())
-        orig_grad = self.capture_gradients(model)
+        orig_params = tuple(self.parameters())
+        orig_grad = self.capture_gradients()
         # Remove all the parameters in the model, because reasons. 
         names = []
-        for name, p in list(model.named_parameters()):
-            del_attr(model, name.split("."))
+        for name, p in list(self.named_parameters()):
+            del_attr(self, name.split("."))
             names.append(name)
             
         self.is_functional = True
         self.names = names
-        return orig_params, orig_grad, names
+        self.orig_params = orig_params
+        self.orig_grad = orig_grad
         
     
     def loss_wrt_params(self, *new_params):
-        # print('Entering loss_wrt_params...', flush=True)
-        self.load_weights(self, self.names, new_params) # Weird! We removed the params before. 
-        # load_weights(mlp, names, new_params, as_params=True) # Weird! We removed the params before. 
+        if self.is_functional:
+            self.load_weights(self.names, new_params) # Weird! We removed the params before. 
+
         if len(tuple(self.named_parameters())) == 0:
             print('Model has no parameters!')
             pass
@@ -62,13 +120,16 @@ class SuperModel(nn.Module):
             else:
                 print(n,p)
                 
-        out = self.forward(self.xlast)  # model output
+        out = self.forward(self.x_now)  # model output
         loss = self.objective(out)  # comparing model to ground truth, in practice. 
         
         loss.backward(retain_graph=True)
         return loss
 
     def load_weights(self, names, params, as_params=False):
+        print('in load_weights...')
+        print('names',names, flush=True)
+        print('params',params)
         for name, p in zip(names, params):
             if not as_params:
                 set_attr(self, name.split("."), p)
@@ -97,9 +158,16 @@ class SuperModel(nn.Module):
             g.update(next_entry)
         return g
     
-def store_input(self, x):
-    self.xlast = x
-
+def store_input(self, x): 
+    # How is self defined here? This does work! I just don't get why. The
+    #   idea is to have the model input available to all SuperModel methods,
+    #   which the toy examples do via a global reference. 
+    #
+    # Anyway, this is the forward_pre_hook that is registered at
+    #   instantiation. 
+    print('storing x:', x[0], flush=True)
+    print('x has type:', type(x[0]))
+    self.x_now = x[0] # get rid of unused extra arg included in hook call
 
 def del_attr(obj, names_split): # why, why, why? But it definitely breaks without this. 
     if len(names_split) == 1:
@@ -190,9 +258,10 @@ if __name__ == "__main__":
 
     in_dim, out_dim = 3, 2
     mlp = SimpleMLP(in_dim, out_dim) 
+    mlp.objective = lambda x : torch.sum(x**2)
     
     xglobal = torch.rand((in_dim,)) 
-    out = mlp(xglobal)  # model output
+    out = mlp(xglobal)  
 
     
     
