@@ -18,31 +18,47 @@ class SuperModel(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__()
         self.register_forward_pre_hook(store_input)
-        self.is_functional = False
+
+    def is_functional(self):
+        return len(tuple(self.parameters)) == 0
                    
     def set_criterion(self, objective):
         self.objective = objective
         
     def max_eigen_H(self):
         
-        # lossfirst = self.loss_wrt_params(*self.orig_params)
+        def loss_wrt_params(*new_params):
+            if self.is_functional:
+                self.load_weights(self.names, new_params, as_params=True) # Weird! We removed the params before. 
+
+            if len(tuple(self.named_parameters())) == 0:
+                print('Model has no parameters!')
+                pass
+            for n,p in mlp.named_parameters():
+                if p is None:
+                    print('whoops p is None!')
+                else:
+                    print(n,p)
+                    
+            out = self.forward(self.x_now)  # model output
+            loss = self.objective(out)  # comparing model to ground truth, in practice. 
+            
+            loss.backward(retain_graph=True)
+            return loss
+
+        self.make_functional()
+
+        # next line makes sure grad is loaded
+        _ = loss_wrt_params(*self.orig_params)  
         gradfirst = self.capture_gradients()
         v_to_dot = tuple([torch.ones_like(p.clone().detach()) \
                           for p in self.parameters()])
 
-        if not self.is_functional:
-            self.make_functional()
-
         params2pass = tuple(p.detach().requires_grad_() for p in self.orig_params)
 
-# For some reason, v_to_dot comes out empty so far. Why? What state is 
-#   the model in? 
-
-        # mlp = copy.deepcopy(mlpsave)
-        print('v_to_dot',v_to_dot)
 
         loss_value, v_dot_hessian = \
-            torch.autograd.functional.vhp(self.loss_wrt_params,
+            torch.autograd.functional.vhp(loss_wrt_params,
                                           params2pass,
                                           v_to_dot, strict=True)
             
@@ -51,7 +67,7 @@ class SuperModel(nn.Module):
             scale_vect(vnext, max_vect_comp(vnext, maxabs=True))
             vprev = copy.deepcopy(vnext) # maybe unnecessary, agf_vhp makes a new copy
             _, vnext = \
-                torch.autograd.functional.vhp(self.loss_wrt_params,
+                torch.autograd.functional.vhp(loss_wrt_params,
                                               params2pass,
                                               vnext, strict=True)
             dtht = angle_vect(vnext, vprev)
@@ -80,7 +96,7 @@ class SuperModel(nn.Module):
         vunit = copy.deepcopy(vnext)
         norm_vect(vunit)
         _, vuH = \
-            torch.autograd.functional.vhp(self.loss_wrt_params,
+            torch.autograd.functional.vhp(loss_wrt_params,
                                           params2pass,
                                           vunit, strict=True)
         
@@ -101,30 +117,13 @@ class SuperModel(nn.Module):
             del_attr(self, name.split("."))
             names.append(name)
             
-        self.is_functional = True
         self.names = names
         self.orig_params = orig_params
         self.orig_grad = orig_grad
         
-    
-    def loss_wrt_params(self, *new_params):
-        if self.is_functional:
-            self.load_weights(self.names, new_params) # Weird! We removed the params before. 
+        self.is_functional = True
 
-        if len(tuple(self.named_parameters())) == 0:
-            print('Model has no parameters!')
-            pass
-        for n,p in mlp.named_parameters():
-            if p is None:
-                print('whoops p is None!')
-            else:
-                print(n,p)
-                
-        out = self.forward(self.x_now)  # model output
-        loss = self.objective(out)  # comparing model to ground truth, in practice. 
-        
-        loss.backward(retain_graph=True)
-        return loss
+    
 
     def load_weights(self, names, params, as_params=False):
         print('in load_weights...')
@@ -165,8 +164,6 @@ def store_input(self, x):
     #
     # Anyway, this is the forward_pre_hook that is registered at
     #   instantiation. 
-    print('storing x:', x[0], flush=True)
-    print('x has type:', type(x[0]))
     self.x_now = x[0] # get rid of unused extra arg included in hook call
 
 def del_attr(obj, names_split): # why, why, why? But it definitely breaks without this. 
