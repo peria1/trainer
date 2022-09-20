@@ -10,6 +10,7 @@ Trying to encapsulate the stuff in vhp_learn.py into a superclass of a
 @author: Bill
 """
 import copy
+import numpy as np
 import torch
 from torch import nn
 
@@ -44,13 +45,15 @@ class SuperModel(nn.Module):
         self.objective = objective
         
     def vH(self, v=None):  # easy interface to vector-Hessian product. 
+    
+        # You can multiply any vector v into the Hessian, but....
         if v is None:
             v = self.default_v  # just 1's, shaped like params.
 
         # This is the loss function that allows Hessian computations
         #   with respect to parameters rather than input. It wraps
-        #   whatever loss function we are training, via this SuperModel
-        #   class. 
+        #   whatever loss function we are training (self.objective), via
+        #   this SuperModel class. 
         def loss_wrt_params(*new_params):
             if self.is_functional:
                 self.load_weights(self.names, new_params) # Weird! We removed the params before. 
@@ -90,22 +93,8 @@ class SuperModel(nn.Module):
             
         lambda_max = torch.sqrt(dot_vect(vnext, vnext)/ \
                                 dot_vect(vprev, vprev)).item()
-        print('Largest eigenvalue of the Hessian is', lambda_max)
-
-        
-        vhpmag = torch.sqrt(dot_vect(vnext, vnext)).item()
-        print('VHP magnitude is', vhpmag)
-        
-        vunit = copy.deepcopy(vnext)
-        norm_vect(vunit)
-        vuH = self.vH(v=vunit)
-        
-        fpp = torch.sqrt(dot_vect(vuH, vuH))    
-        # this is the step size, in the vunit direction, that should bring 
-        #   the gradient magnitude to zero. 
-        # scale = gradmag/fpp  
-        # print('scale is', scale)
-
+            
+        return vnext, lambda_max
     
     
     
@@ -120,17 +109,24 @@ class SuperModel(nn.Module):
             else:
                 set_attr(self, name.split("."), torch.nn.Parameter(p))
     
-    def restore_model(self, names, params, grad): # (this one is mine)
-        self.load_weights(self.names, params, as_params=True)
+    def restore_model(self): # (this one is mine)
+        if not self.is_functional():
+            return  # no need to restore....
+        
+        self.load_weights(self.names, self.orig_params, as_params=True)
+        
+        grad = self.orig_grad
         for k, v in self.named_parameters():
             kg = k + '.grad'
             if grad[kg] is not None:
                 v.grad = grad[kg].clone().detach()
             else:
                 v.grad = None
-        # self.is_functional = False
     
-    def capture_gradients(self): # returns gradients in dict vector form (this one is also mine)
+     # returns gradients in dict vector form (this one is also mine)
+    def capture_gradients(self):
+        if self.is_functional():
+            self.restore_model()
         g = {}
         for k, v in self.named_parameters():
             gnext = v.grad
@@ -252,5 +248,61 @@ if __name__ == "__main__":
     
     out = mlp(xglobal)  
 
+
+# ---------------------
+
+    v_eig, lambda_max = mlp.max_eigen_H()
+
+    grad_tuple = dict_to_tuple(mlp.capture_gradients())
+    print("eigenvector is", v_eig)
+    print('angle between eigenvector and gradient is', \
+          int(angle_vect(grad_tuple, v_eig)*180/np.pi),'degrees.')
+        
+    print('Largest eigenvalue of the Hessian is', lambda_max)
+
+    gradmag = torch.sqrt(dot_vect(grad_tuple, grad_tuple)).item()
+    print('gradient magnitude is', gradmag)
+    
+    vhpmag = torch.sqrt(dot_vect(v_eig, v_eig)).item()
+    print('VHP magnitude is', vhpmag)
     
     
+    vunit = copy.deepcopy(v_eig)
+    norm_vect(vunit)
+    vuH = mlp.vH(vunit)
+        
+    
+    fpp = torch.sqrt(dot_vect(vuH, vuH))    
+    # this is the step size, in the vunit direction, that should bring 
+    #   the gradient magnitude to zero, if the gradient varies linearly. 
+    # It's delta_x = y_now/slope...a step that big should bring y to zero. 
+    scale = gradmag/fpp  
+    print('Expect zero gradient after step of',scale.item())
+    
+    
+    # The following shows that I can step and then step back, with plain
+    #   SGD. This is stepping along the gradient though, not in the max
+    #   eigen direction. 
+    
+    if mlp.is_functional():
+        mlp.restore_model()
+        
+    optimizer = torch.optim.SGD(mlp.parameters(), lr=1e-3)
+    
+    loss0 = mlp.objective(mlp(xglobal))
+    print('Initial loss ', loss0.item())
+   
+    optimizer.step()
+
+    # Get updated loss
+    out1 = mlp(xglobal)
+    loss1 = mlp.objective(out1)
+    print('Updated loss ', loss1.item())
+
+    # Use negative lr to revert loss
+    optimizer.param_groups[0]['lr'] = -1. * optimizer.param_groups[0]['lr']
+    
+    optimizer.step()
+    out2 = mlp(xglobal)
+    loss2 = mlp.objective(out2)
+    print('Reverted loss ', loss2.item())
