@@ -10,26 +10,47 @@ Trying to encapsulate the stuff in vhp_learn.py into a superclass of a
 @author: Bill
 """
 import copy
-import numpy as np
 import torch
 from torch import nn
 
 class SuperModel(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__()
-        self.register_forward_pre_hook(store_input)
+        self.default_v = None
+        self.register_forward_pre_hook(store_inputs)
 
     def is_functional(self):
-        return len(tuple(self.parameters)) == 0
+        return len(tuple(self.parameters())) == 0
+
+    def make_functional(self):
+        orig_params = tuple(self.parameters())
+        if self.default_v is None:
+            self.default_v = tuple([torch.ones_like(p.clone().detach()) \
+                                          for p in self.parameters()])
+
+        orig_grad = self.capture_gradients()
+        # Remove all the parameters in the model, because reasons. 
+        names = []
+        for name, p in list(self.named_parameters()):
+            del_attr(self, name.split("."))
+            names.append(name)
+            
+        self.names = names
+        self.orig_params = orig_params
+        self.orig_grad = orig_grad
+        
                    
     def set_criterion(self, objective):
         self.objective = objective
         
-    def vH(self, v=None):
+    def vH(self, v=None):  # easy interface to vector-Hessian product. 
         if v is None:
-            v = tuple([torch.ones_like(p.clone().detach()) \
-                              for p in self.parameters()])
+            v = self.default_v  # just 1's, shaped like params.
 
+        # This is the loss function that allows Hessian computations
+        #   with respect to parameters rather than input. It wraps
+        #   whatever loss function we are training, via this SuperModel
+        #   class. 
         def loss_wrt_params(*new_params):
             if self.is_functional:
                 self.load_weights(self.names, new_params) # Weird! We removed the params before. 
@@ -38,11 +59,12 @@ class SuperModel(nn.Module):
             loss.backward(retain_graph=True)
             return loss
     
-        self.make_functional() # monkey-patching, step 1...
+        if not self.is_functional():
+            self.make_functional() # monkey-patching, step 1...
             
         params2pass = tuple(p.detach().requires_grad_() for p in self.orig_params)
     
-        _ = loss_wrt_params(*self.orig_params)
+        _ = loss_wrt_params(*self.orig_params) # Unpatched inside function...
         _ = self.capture_gradients()
 
         self.make_functional() # monkey-patching now complete. Wow.
@@ -55,69 +77,27 @@ class SuperModel(nn.Module):
 
         
     def max_eigen_H(self):
-        
-
-        # self.make_functional()
-        # # next line makes sure grad is loaded
-        # _ = loss_wrt_params(*self.orig_params)  
-        # gradfirst = self.capture_gradients()
-        # v_to_dot = tuple([torch.ones_like(p.clone().detach()) \
-        #                   for p in self.parameters()])
-
-        # params2pass = tuple(p.detach().requires_grad_() for p in self.orig_params)
-
-        # print('loss_wrt_params is', type(loss_wrt_params), flush=True)
-        # print('params2pass', params2pass, type(params2pass), flush=True)
-        # print('v_to_dot', v_to_dot, type(v_to_dot), flush=True)
-        
-        # print()
-        # self.make_functional()
-        
-        # loss_value, v_dot_hessian = \
-        #     torch.autograd.functional.vhp(loss_wrt_params,
-        #                                   params2pass,
-        #                                   v_to_dot, strict=True)
-        
         v_dot_hessian = self.vH()
             
         vnext = copy.deepcopy(v_dot_hessian)
         while True:
             scale_vect(vnext, max_vect_comp(vnext, maxabs=True))
             vprev = copy.deepcopy(vnext) # maybe unnecessary, agf_vhp makes a new copy
-            # _, vnext = \
-            #     torch.autograd.functional.vhp(loss_wrt_params,
-            #                                   params2pass,
-            #                                   vnext, strict=True)
             vnext = self.vH(v=vnext)
             dtht = angle_vect(vnext, vprev)
             if dtht < 0.0001:
                 break
-            else:
-                # print(dtht.item())
-                pass
-            
-        # grad_tuple = dict_to_tuple(gradfirst)
-        # print("eigenvector is", vnext)
-        # print('angle between eigenvector and gradient is', \
-        #       int(angle_vect(grad_tuple, vnext)*180/np.pi),'degrees.')
             
         lambda_max = torch.sqrt(dot_vect(vnext, vnext)/ \
                                 dot_vect(vprev, vprev)).item()
         print('Largest eigenvalue of the Hessian is', lambda_max)
 
-        # gradmag = torch.sqrt(dot_vect(grad_tuple, grad_tuple)).item()
-        # print('gradient magnitude is', gradmag)
         
         vhpmag = torch.sqrt(dot_vect(vnext, vnext)).item()
         print('VHP magnitude is', vhpmag)
         
-        
         vunit = copy.deepcopy(vnext)
         norm_vect(vunit)
-        # _, vuH = \
-        #     torch.autograd.functional.vhp(loss_wrt_params,
-        #                                   params2pass,
-        #                                   vunit, strict=True)
         vuH = self.vH(v=vunit)
         
         fpp = torch.sqrt(dot_vect(vuH, vuH))    
@@ -128,21 +108,6 @@ class SuperModel(nn.Module):
 
     
     
-    def make_functional(self):
-        orig_params = tuple(self.parameters())
-        orig_grad = self.capture_gradients()
-        # Remove all the parameters in the model, because reasons. 
-        names = []
-        for name, p in list(self.named_parameters()):
-            del_attr(self, name.split("."))
-            names.append(name)
-            
-        self.names = names
-        self.orig_params = orig_params
-        self.orig_grad = orig_grad
-        
-        self.is_functional = True
-
     
 
     def load_weights(self, names, params, as_params=False):
@@ -163,7 +128,7 @@ class SuperModel(nn.Module):
                 v.grad = grad[kg].clone().detach()
             else:
                 v.grad = None
-        self.is_functional = False
+        # self.is_functional = False
     
     def capture_gradients(self): # returns gradients in dict vector form (this one is also mine)
         g = {}
@@ -177,7 +142,7 @@ class SuperModel(nn.Module):
             g.update(next_entry)
         return g
     
-def store_input(self, x): 
+def store_inputs(self, x): 
     # How is self defined here? This does work! I just don't get why. The
     #   idea is to have the model input available to all SuperModel methods,
     #   which the toy examples do via a global reference. 
@@ -185,6 +150,9 @@ def store_input(self, x):
     # Anyway, this is the forward_pre_hook that is registered at
     #   instantiation. 
     self.x_now = x[0] # get rid of unused extra arg included in hook call
+    if self.default_v is None:
+        self.default_v = tuple([torch.ones_like(p.clone().detach()) \
+                                      for p in self.parameters()])
 
 def del_attr(obj, names_split): # why, why, why? But it definitely breaks without this. 
     if len(names_split) == 1:
