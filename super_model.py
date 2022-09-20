@@ -6,7 +6,36 @@ Trying to encapsulate the stuff in vhp_learn.py into a superclass of a
     Pytorch model. I am trying to use this class as a "global" context, 
     so I can get rid of all the global references that the toy code in 
     vhp_learn uses. 
-    
+
+You can subclass SuperModel instead of torch.nn.Module, and call its 
+__init__ when making a model. This does a few things:
+
+
+1) Calls nn.Module __init__()
+
+2) Makes a default vector attribute, to be loaded later once parameters are 
+defined. This is the "vector to dot into the Hessian matrix".
+
+3) Register a hook to be called when forward is called, i.e. during inference. 
+This hook takes the input data and stores it in a SuperModel attribute called
+xlast, and also sets the default vector attribute to be a tuple of tensors
+containing 1's, each with the same shape as the model parameter to which
+it corresponds. 
+
+I do not understand how this works in detail. But basically, to use the 
+autograd.functional methods, we need to be looking at derivatives with 
+respect to inputs, not model parameters. So we need to wrap the function 
+that we are training in a function that takes the model parameters as its 
+inputs. 
+
+Furthermore, whenever we want to calculate something with autograd.functional, 
+we need to call SuperModel.make_functional(). This function deletes all the
+parameters from the model, and stores them in SuperModel attributes. No, I 
+am not joking. Once we have done this, we can go ahead with the calculation. 
+
+This is not yet general; it can only calculate the vector-Hessian product. 
+But that's all I want so far!
+
 @author: Bill
 """
 import copy
@@ -43,9 +72,13 @@ class SuperModel(nn.Module):
                    
     def set_criterion(self, objective):
         self.objective = objective
-        
-    def vH(self, v=None):  # easy interface to vector-Hessian product. 
     
+    def zero_grad(self):
+        for v in self.parameters():
+            if v.grad is not None:
+                v.grad[:] = 0.0
+       
+    def vH(self, v=None):  # easy interface to vector-Hessian product. 
         # You can multiply any vector v into the Hessian, but....
         if v is None:
             v = self.default_v  # just 1's, shaped like params.
@@ -57,8 +90,12 @@ class SuperModel(nn.Module):
         def loss_wrt_params(*new_params):
             if self.is_functional:
                 self.load_weights(self.names, new_params) # Weird! We removed the params before. 
+                # self.restore_model()  # Does NOT work with this line in place
                     
             loss = self.objective(self.forward(self.x_now))  
+            
+            self.zero_grad()
+            
             loss.backward(retain_graph=True)
             return loss
     
@@ -85,12 +122,13 @@ class SuperModel(nn.Module):
         vnext = copy.deepcopy(v_dot_hessian)
         while True:
             scale_vect(vnext, max_vect_comp(vnext, maxabs=True))
-            vprev = copy.deepcopy(vnext) # maybe unnecessary, agf_vhp makes a new copy
+            vprev = vnext # agf_vhp makes a new copy, whew....
             vnext = self.vH(v=vnext)
             dtht = angle_vect(vnext, vprev)
+            
             if dtht < 0.0001:
                 break
-            
+        
         lambda_max = torch.sqrt(dot_vect(vnext, vnext)/ \
                                 dot_vect(vprev, vprev)).item()
             
@@ -100,9 +138,6 @@ class SuperModel(nn.Module):
     
 
     def load_weights(self, names, params, as_params=False):
-        # print('in load_weights...')
-        # print('names',names, flush=True)
-        # print('params',params)
         for name, p in zip(names, params):
             if not as_params:
                 set_attr(self, name.split("."), p)
@@ -137,7 +172,8 @@ class SuperModel(nn.Module):
                 next_entry = {knext: None}
             g.update(next_entry)
         return g
-    
+
+
 def store_inputs(self, x): 
     # How is self defined here? This does work! I just don't get why. The
     #   idea is to have the model input available to all SuperModel methods,
@@ -228,7 +264,6 @@ if __name__ == "__main__":
     
     torch.manual_seed(0)
 
-    
     class SimpleMLP(SuperModel):
         def __init__(self, in_dim, out_dim):
             super().__init__()
@@ -247,13 +282,14 @@ if __name__ == "__main__":
     mlp.objective = lambda x : torch.sum(x**2)
     
     out = mlp(xglobal)  
+    print('grads before eigs', mlp.capture_gradients())
 
-
-# ---------------------
 
     v_eig, lambda_max = mlp.max_eigen_H()
 
     grad_tuple = dict_to_tuple(mlp.capture_gradients())
+    print('grad_tuple is', grad_tuple)
+    
     print("eigenvector is", v_eig)
     print('angle between eigenvector and gradient is', \
           int(angle_vect(grad_tuple, v_eig)*180/np.pi),'degrees.')
