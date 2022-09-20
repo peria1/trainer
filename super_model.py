@@ -25,8 +25,11 @@ class SuperModel(nn.Module):
     def set_criterion(self, objective):
         self.objective = objective
         
-    def max_eigen_H(self):
-        
+    def vH(self, v=None):
+        if v is None:
+            v = tuple([torch.ones_like(p.clone().detach()) \
+                              for p in self.parameters()])
+
         def loss_wrt_params(*new_params):
             if self.is_functional:
                 self.load_weights(self.names, new_params, as_params=True) # Weird! We removed the params before. 
@@ -45,31 +48,62 @@ class SuperModel(nn.Module):
             
             loss.backward(retain_graph=True)
             return loss
-
+    
         self.make_functional()
-
-        # next line makes sure grad is loaded
-        _ = loss_wrt_params(*self.orig_params)  
-        gradfirst = self.capture_gradients()
-        v_to_dot = tuple([torch.ones_like(p.clone().detach()) \
-                          for p in self.parameters()])
-
+            
         params2pass = tuple(p.detach().requires_grad_() for p in self.orig_params)
+    
+        _ = loss_wrt_params(*self.orig_params)
+        _ = self.capture_gradients()
 
-
-        loss_value, v_dot_hessian = \
+        # print('lossfirst (via params) is', lossfirst.item())
+        # losscheck = objective(mlp(xglobal))
+        # print('loss via input is', losscheck.item())
+        print('vh!!!!!!!!!!')
+        print(params2pass, v)
+        self.make_functional()
+        _, v_dot_hessian = \
             torch.autograd.functional.vhp(loss_wrt_params,
                                           params2pass,
-                                          v_to_dot, strict=True)
+                                          v, strict=True)
+        return v_dot_hessian
+
+        
+    def max_eigen_H(self):
+        
+
+        # self.make_functional()
+        # # next line makes sure grad is loaded
+        # _ = loss_wrt_params(*self.orig_params)  
+        # gradfirst = self.capture_gradients()
+        # v_to_dot = tuple([torch.ones_like(p.clone().detach()) \
+        #                   for p in self.parameters()])
+
+        # params2pass = tuple(p.detach().requires_grad_() for p in self.orig_params)
+
+        # print('loss_wrt_params is', type(loss_wrt_params), flush=True)
+        # print('params2pass', params2pass, type(params2pass), flush=True)
+        # print('v_to_dot', v_to_dot, type(v_to_dot), flush=True)
+        
+        # print()
+        # self.make_functional()
+        
+        # loss_value, v_dot_hessian = \
+        #     torch.autograd.functional.vhp(loss_wrt_params,
+        #                                   params2pass,
+        #                                   v_to_dot, strict=True)
+        
+        v_dot_hessian = self.vH()
             
         vnext = copy.deepcopy(v_dot_hessian)
         while True:
             scale_vect(vnext, max_vect_comp(vnext, maxabs=True))
             vprev = copy.deepcopy(vnext) # maybe unnecessary, agf_vhp makes a new copy
-            _, vnext = \
-                torch.autograd.functional.vhp(loss_wrt_params,
-                                              params2pass,
-                                              vnext, strict=True)
+            # _, vnext = \
+            #     torch.autograd.functional.vhp(loss_wrt_params,
+            #                                   params2pass,
+            #                                   vnext, strict=True)
+            vnext = self.vH(v=vnext)
             dtht = angle_vect(vnext, vprev)
             if dtht < 0.0001:
                 break
@@ -77,17 +111,17 @@ class SuperModel(nn.Module):
                 # print(dtht.item())
                 pass
             
-        grad_tuple = dict_to_tuple(gradfirst)
-        print("eigenvector is", vnext)
-        print('angle between eigenvector and gradient is', \
-              int(angle_vect(grad_tuple, vnext)*180/np.pi),'degrees.')
+        # grad_tuple = dict_to_tuple(gradfirst)
+        # print("eigenvector is", vnext)
+        # print('angle between eigenvector and gradient is', \
+        #       int(angle_vect(grad_tuple, vnext)*180/np.pi),'degrees.')
             
         lambda_max = torch.sqrt(dot_vect(vnext, vnext)/ \
                                 dot_vect(vprev, vprev)).item()
         print('Largest eigenvalue of the Hessian is', lambda_max)
 
-        gradmag = torch.sqrt(dot_vect(grad_tuple, grad_tuple)).item()
-        print('gradient magnitude is', gradmag)
+        # gradmag = torch.sqrt(dot_vect(grad_tuple, grad_tuple)).item()
+        # print('gradient magnitude is', gradmag)
         
         vhpmag = torch.sqrt(dot_vect(vnext, vnext)).item()
         print('VHP magnitude is', vhpmag)
@@ -95,16 +129,17 @@ class SuperModel(nn.Module):
         
         vunit = copy.deepcopy(vnext)
         norm_vect(vunit)
-        _, vuH = \
-            torch.autograd.functional.vhp(loss_wrt_params,
-                                          params2pass,
-                                          vunit, strict=True)
+        # _, vuH = \
+        #     torch.autograd.functional.vhp(loss_wrt_params,
+        #                                   params2pass,
+        #                                   vunit, strict=True)
+        vuH = self.vH(v=vunit)
         
         fpp = torch.sqrt(dot_vect(vuH, vuH))    
         # this is the step size, in the vunit direction, that should bring 
         #   the gradient magnitude to zero. 
-        scale = gradmag/fpp  
-        print('scale is', scale)
+        # scale = gradmag/fpp  
+        # print('scale is', scale)
 
     
     
@@ -126,9 +161,9 @@ class SuperModel(nn.Module):
     
 
     def load_weights(self, names, params, as_params=False):
-        print('in load_weights...')
-        print('names',names, flush=True)
-        print('params',params)
+        # print('in load_weights...')
+        # print('names',names, flush=True)
+        # print('params',params)
         for name, p in zip(names, params):
             if not as_params:
                 set_attr(self, name.split("."), p)
@@ -242,6 +277,9 @@ def dict_to_tuple(d):
     
 if __name__ == "__main__":
     
+    torch.manual_seed(0)
+
+    
     class SimpleMLP(SuperModel):
         def __init__(self, in_dim, out_dim):
             super().__init__()
@@ -254,10 +292,11 @@ if __name__ == "__main__":
             return torch.sigmoid(self.layers(x))
 
     in_dim, out_dim = 3, 2
+    xglobal = torch.rand((in_dim,)) 
+
     mlp = SimpleMLP(in_dim, out_dim) 
     mlp.objective = lambda x : torch.sum(x**2)
     
-    xglobal = torch.rand((in_dim,)) 
     out = mlp(xglobal)  
 
     
