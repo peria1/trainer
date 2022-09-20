@@ -262,7 +262,6 @@ if __name__ == "__main__":
         
     print('vH is', v_dot_hessian,'\n')
         
-    assert(1==0)
     
     # print('back from loss and vH...')
     # restore_model(mlp, names, orig_params, orig_grad)
@@ -292,6 +291,8 @@ if __name__ == "__main__":
             pass
         
     grad_tuple = dict_to_tuple(gradfirst)
+    print('grad_tuple is', grad_tuple)
+    
     print("eigenvector is", vnext)
     print('angle between eigenvector and gradient is', \
           int(angle_vect(grad_tuple, vnext)*180/np.pi),'degrees.')
