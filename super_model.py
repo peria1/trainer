@@ -32,36 +32,21 @@ class SuperModel(nn.Module):
 
         def loss_wrt_params(*new_params):
             if self.is_functional:
-                self.load_weights(self.names, new_params, as_params=True) # Weird! We removed the params before. 
-
-            if len(tuple(self.named_parameters())) == 0:
-                print('Model has no parameters!')
-                pass
-            for n,p in mlp.named_parameters():
-                if p is None:
-                    print('whoops p is None!')
-                else:
-                    print(n,p)
+                self.load_weights(self.names, new_params) # Weird! We removed the params before. 
                     
-            out = self.forward(self.x_now)  # model output
-            loss = self.objective(out)  # comparing model to ground truth, in practice. 
-            
+            loss = self.objective(self.forward(self.x_now))  
             loss.backward(retain_graph=True)
             return loss
     
-        self.make_functional()
+        self.make_functional() # monkey-patching, step 1...
             
         params2pass = tuple(p.detach().requires_grad_() for p in self.orig_params)
     
         _ = loss_wrt_params(*self.orig_params)
         _ = self.capture_gradients()
 
-        # print('lossfirst (via params) is', lossfirst.item())
-        # losscheck = objective(mlp(xglobal))
-        # print('loss via input is', losscheck.item())
-        print('vh!!!!!!!!!!')
-        print(params2pass, v)
-        self.make_functional()
+        self.make_functional() # monkey-patching now complete. Wow.
+
         _, v_dot_hessian = \
             torch.autograd.functional.vhp(loss_wrt_params,
                                           params2pass,

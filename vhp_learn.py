@@ -179,8 +179,9 @@ def loss_wrt_params(*new_params):
     #     else:
     #         print(n,p)
             
-    out = mlp(xglobal)  # model output
-    loss = objective(out)  # comparing model to ground truth, in practice. 
+    # out = mlp(xglobal)  # model output
+    # loss = objective(out)  # comparing model to ground truth, in practice. 
+    loss = objective(mlp(xglobal))  # comparing model to ground truth, in practice. 
     
     loss.backward(retain_graph=True)
     return loss
@@ -249,9 +250,9 @@ if __name__ == "__main__":
     print('lossfirst (via params) is', lossfirst.item())
     losscheck = objective(mlp(xglobal))
     print('loss via input is', losscheck.item())
-    # mlp = copy.deepcopy(mlpsave)
+
     orig_params, orig_grad, names = make_functional(mlp)
-    
+
     print(params2pass, v_to_dot)
     
     loss_value, v_dot_hessian = \
@@ -261,6 +262,8 @@ if __name__ == "__main__":
         
     print('vH is', v_dot_hessian,'\n')
         
+    assert(1==0)
+    
     # print('back from loss and vH...')
     # restore_model(mlp, names, orig_params, orig_grad)
     
