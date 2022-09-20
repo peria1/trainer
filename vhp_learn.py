@@ -170,14 +170,14 @@ def loss_wrt_params(*new_params):
     # print('Entering loss_wrt_params...', flush=True)
     load_weights(mlp, names, new_params) # Weird! We removed the params before. 
     # load_weights(mlp, names, new_params, as_params=True) # Weird! We removed the params before. 
-    if len(tuple(mlp.named_parameters())) == 0:
-        # print('Model has no parameters!')
-        pass
-    for n,p in mlp.named_parameters():
-        if p is None:
-            print('whoops p is None!')
-        else:
-            print(n,p)
+    # if len(tuple(mlp.named_parameters())) == 0:
+    #     # print('Model has no parameters!')
+    #     pass
+    # for n,p in mlp.named_parameters():
+    #     if p is None:
+    #         print('whoops p is None!')
+    #     else:
+    #         print(n,p)
             
     out = mlp(xglobal)  # model output
     loss = objective(out)  # comparing model to ground truth, in practice. 
@@ -224,33 +224,25 @@ class Hessian(): # looking for a way to encapsulate the global context, since
 
 if __name__ == "__main__":
     
-    # torch.manual_seed(0)
+    torch.manual_seed(0)
 
     
     print('Here we go...just defs to start')
+
     # your model instantiation
     in_dim, out_dim = 3, 2
-    mlp = SimpleMLP(in_dim, out_dim) # this is the global reference
-    
-    v_to_dot = tuple([torch.ones_like(p.clone().detach()) for p in mlp.parameters()])
-    
     xglobal = torch.rand((in_dim,)) # need to eliminate this and other global refs. 
+
+    mlp = SimpleMLP(in_dim, out_dim) # this is the global reference
+    v_to_dot = tuple([torch.ones_like(p.clone().detach()) for p in mlp.parameters()])
     
     orig_params, orig_grad, names = make_functional(mlp)
         
     params2pass = tuple(p.detach().requires_grad_() for p in orig_params)
     
     print('computing loss and vH...')
-    # 
-    print('len(tuple(parameters)) is', len(tuple(mlp.parameters())))
-    for p in mlp.parameters():
-        print('1: p is',p)
-        if p is None:
-            print('OMG')
-        print('1:p.grad is', p.grad, flush=True)
+
     lossfirst = loss_wrt_params(*orig_params)
-    for p in mlp.parameters():
-        print('2:p.grad is', p.grad)
 
     gradfirst = capture_gradients(mlp)
 
@@ -259,10 +251,15 @@ if __name__ == "__main__":
     print('loss via input is', losscheck.item())
     # mlp = copy.deepcopy(mlpsave)
     orig_params, orig_grad, names = make_functional(mlp)
+    
+    print(params2pass, v_to_dot)
+    
     loss_value, v_dot_hessian = \
         torch.autograd.functional.vhp(loss_wrt_params,
                                       params2pass,
                                       v_to_dot, strict=True)
+        
+    print('vH is', v_dot_hessian,'\n')
         
     # print('back from loss and vH...')
     # restore_model(mlp, names, orig_params, orig_grad)
