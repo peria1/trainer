@@ -19,12 +19,13 @@ import torch.utils.data
 from torch import nn
 from torchvision.models.vgg import VGG
 import numpy as np
+from super_model import SuperModel
 
 from criteria import *
 
 
 
-class one_linear_layer(nn.Module):
+class one_linear_layer(SuperModel):
     def __init__(self, problem):
         super().__init__()
 
@@ -41,7 +42,7 @@ class one_linear_layer(nn.Module):
     def forward(self,x):
         return self.L1(x)
 
-class one_linear_layer_to_n(nn.Module):
+class one_linear_layer_to_n(SuperModel):
     def __init__(self, problem):
         super().__init__()
 
@@ -55,7 +56,7 @@ class one_linear_layer_to_n(nn.Module):
         return self.L1(x)
 
      
-class bisect_to_power_of_two(nn.Module):
+class bisect_to_power_of_two(SuperModel):
     def __init__(self, problem):   
         super().__init__()
 
@@ -75,7 +76,7 @@ class bisect_to_power_of_two(nn.Module):
         self.nout = nout
         
         n = npts*2
-        self.layer_list = nn.ModuleList([nn.Linear(npts,n)])
+        self.layer_list = SuperModelList([nn.Linear(npts,n)])
         while n > nout:
             self.layer_list.append(nn.Linear(n,n//2))
             n//=2
@@ -90,7 +91,7 @@ class bisect_to_power_of_two(nn.Module):
 
 
 
-class n_double_n_act(nn.Module): # moved to n_double_n
+class n_double_n_act(SuperModel): # moved to n_double_n
     def __init__(self, problem): 
         super().__init__()
 
@@ -127,7 +128,7 @@ class n_double_n_act(nn.Module): # moved to n_double_n
 
 
 
-class n_double_n(nn.Module): # moved to n_double_n
+class n_double_n(SuperModel): # moved to n_double_n
     def __init__(self, problem): 
         super().__init__()
 
@@ -161,7 +162,7 @@ class n_double_n(nn.Module): # moved to n_double_n
         
         return dataflow
 
-class n_double_one(nn.Module):  # moved to n_double_one
+class n_double_one(SuperModel):  # moved to n_double_one
     def __init__(self, problem):  # trying to see if machine can tell that y is the sum over x 
         super().__init__()
 
@@ -204,7 +205,7 @@ class n_double_one(nn.Module):  # moved to n_double_one
 
 
 
-class n_double_nout(nn.Module):  # moved to n_double_one
+class n_double_nout(SuperModel):  # moved to n_double_one
     def __init__(self, problem):  # trying to see if machine can tell that y is the sum over x 
         super().__init__()
 
@@ -250,7 +251,7 @@ class n_double_nout(nn.Module):  # moved to n_double_one
 
 
 
-class n_double_one_tanh(nn.Module):    # moved to n_double_one_tanh
+class n_double_one_tanh(SuperModel):    # moved to n_double_one_tanh
     def __init__(self, problem):  # trying to see if machine can tell that y is the sum over x 
         super().__init__()
 
@@ -287,7 +288,7 @@ class n_double_one_tanh(nn.Module):    # moved to n_double_one_tanh
 
 
 
-class vectorVAE(nn.Module):   # moved to vectorVAE
+class vectorVAE(SuperModel):   # moved to vectorVAE
     def __init__(self, problem, dim=2):  # trying to see if machine can tell that y is the sum over x 
         super().__init__()
         
@@ -339,7 +340,7 @@ class vectorVAE(nn.Module):   # moved to vectorVAE
 
 
 #--------------------
-class TrainerRNN(nn.Module):
+class TrainerRNN(SuperModel):
     def __init__(self, problem, npts=None, nbatch=None, nout=None):
         super().__init__()
         
@@ -451,7 +452,7 @@ class VGGNet(VGG):
         return torch.softmax(score,1)
 
 
-class YOLAB(nn.Module):
+class YOLAB(SuperModel):
     
     def __init__(self, problem):
         super().__init__()
@@ -685,7 +686,7 @@ class YOLAB(nn.Module):
 
 
 
-class RNN(nn.Module):
+class RNN(SuperModel ):
     def __init__(self, input_size, output_size, hidden_dim, n_layers):
         super().__init__()
 

@@ -69,8 +69,8 @@ class SuperModel(nn.Module):
         self.orig_params = orig_params
         self.orig_grad = orig_grad
         
-                   
     def set_criterion(self, objective):
+        assert callable(objective)
         self.objective = objective
     
     def zero_grad(self):
@@ -120,7 +120,9 @@ class SuperModel(nn.Module):
         v_dot_hessian = self.vH()
             
         vnext = copy.deepcopy(v_dot_hessian)
+        count = 0
         while True:
+            count += 1
             scale_vect(vnext, max_vect_comp(vnext, maxabs=True))
             vprev = vnext # agf_vhp makes a new copy, whew....
             vnext = self.vH(v=vnext)
@@ -128,6 +130,9 @@ class SuperModel(nn.Module):
             
             if dtht < 0.0001:
                 break
+            elif count > 1000:
+                print('ACK! Too many iterations  in max_eigen_H...')
+                return None
         
         lambda_max = torch.sqrt(dot_vect(vnext, vnext)/ \
                                 dot_vect(vprev, vprev)).item()
@@ -198,8 +203,6 @@ def set_attr(obj, names_split, val):
     else:
         set_attr(getattr(obj, names_split[0]), names_split[1:], val)
 
-
-  
 def sigmoid(x):
     return 1 /(1+torch.exp(-x))
 
