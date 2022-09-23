@@ -91,8 +91,9 @@ class SuperModel(nn.Module):
             if self.is_functional:
                 self.load_weights(self.names, new_params) # Weird! We removed the params before. 
                 # self.restore_model()  # Does NOT work with this line in place
-                    
-            loss = self.objective(self.forward(self.x_now))  
+            
+            pred = self.forward(self.x_now)
+            loss = self.objective(pred)  # how to get targets into objective?   
             
             self.zero_grad()
             
@@ -139,9 +140,6 @@ class SuperModel(nn.Module):
             
         return vnext, lambda_max
     
-    
-    
-
     def load_weights(self, names, params, as_params=False):
         for name, p in zip(names, params):
             if not as_params:
