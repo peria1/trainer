@@ -347,7 +347,7 @@ if __name__=="__main__":
     grad_history = np.zeros(niter)
     gangle_history = np.zeros(niter)
     step_history = np.zeros(niter)
-    sangle_hiostory = np.zeros(niter)
+    sangle_history = np.zeros(niter)
     
     vm1 = np.zeros((niter,3))
     v0 = np.zeros((niter,3))
@@ -399,7 +399,7 @@ if __name__=="__main__":
     grad_history = grad_history[0:istop]
     gangle_history = gangle_history[0:istop]
     xyz = np.cumsum(xyz[0:istop, :], 0)
-    # sangle_history = sangle_history[0:istop]
+    sangle_history = sangle_history[0:istop]
     
     npow = np.round(1.33*istop)
     power_law_pred = loss_history[0]*(1-tvt.eps)**np.linspace(0,npow-1,npow)
