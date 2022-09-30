@@ -78,7 +78,7 @@ class SuperModel(nn.Module):
             if v.grad is not None:
                 v.grad[:] = 0.0
        
-    def vH(self, v=None):  # easy interface to vector-Hessian product. 
+    def vH(self, v=None, *targs):  # easy interface to vector-Hessian product. 
         # You can multiply any vector v into the Hessian, but....
         if v is None:
             v = self.default_v  # just 1's, shaped like params.
@@ -93,7 +93,7 @@ class SuperModel(nn.Module):
                 # self.restore_model()  # Does NOT work with this line in place
             
             pred = self.forward(self.x_now)
-            loss = self.objective(pred)  # how to get targets into objective?   
+            loss = self.objective(pred, *targs)    
             
             self.zero_grad()
             
@@ -117,6 +117,9 @@ class SuperModel(nn.Module):
         return v_dot_hessian
 
         
+    def ext_eigen_H(self):
+        pass
+        
     def max_eigen_H(self):
         v_dot_hessian = self.vH()
             
@@ -129,7 +132,7 @@ class SuperModel(nn.Module):
             vnext = self.vH(v=vnext)
             dtht = angle_vect(vnext, vprev)
             
-            if dtht < 0.0001:
+            if (dtht % np.pi) < 0.0001:
                 break
             elif count > 1000:
                 print('ACK! Too many iterations  in max_eigen_H...')
@@ -139,6 +142,35 @@ class SuperModel(nn.Module):
                                 dot_vect(vprev, vprev)).item()
             
         return vnext, lambda_max
+
+    def min_eigen_H(self, lambda_max):
+        v_dot_hessian = self.vH()
+            
+        vnext = copy.deepcopy(v_dot_hessian)
+        count = 0
+        while True:
+            count += 1
+            scale_vect(vnext, max_vect_comp(vnext, maxabs=True))
+            vprev = vnext
+            
+            decr = copy.deepcopy(vprev)
+            scale_vect(decr, -1/lambda_max)
+            
+            vnext = add_vect(self.vH(v=vprev), decr)
+            dtht = angle_vect(vnext, vprev)
+            print('dtht is',dtht)
+            
+            if (dtht % np.pi) < 0.0001:
+                break
+            elif count > 1000:
+                print('ACK! Too many iterations  in min_eigen_H...')
+                return None
+        
+        lambda_min = torch.sqrt(dot_vect(vnext, vnext)/ \
+                                dot_vect(vprev, vprev)).item()
+            
+        return vnext, lambda_min
+
     
     def load_weights(self, names, params, as_params=False):
         for name, p in zip(names, params):
@@ -247,6 +279,19 @@ def dot_vect(a,b):
         adotb = None
     return adotb
    
+def add_vect(a,b):
+    c = list(copy.deepcopy(a))
+    try:
+        for i,(ai,bi) in enumerate(zip(a,b)):
+            assert(ai.shape == bi.shape)
+            c[i] = ai + bi           
+    except TypeError:
+        assert(a.shape==b.shape)
+        c = a + b
+    except AssertionError:
+        print('OOPS!', a.shape, b.shape)
+        c = None
+    return tuple(c)
 
 def angle_vect(a,b):
     cos_ab = dot_vect(a,b)/torch.sqrt(dot_vect(a,a)*dot_vect(b,b))
