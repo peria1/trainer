@@ -48,7 +48,9 @@ class SuperModel(nn.Module):
         super().__init__()
         self.default_v = None
         self.register_forward_pre_hook(store_inputs)
-        self.allowed_angular_error = 0.0001 # radians
+        self.allowed_angular_error = 0.001 # radians
+        self.allowed_cos_error = 1-np.cos(self.allowed_angular_error)
+        print(self.allowed_cos_error)
         self.no_warning = False
         self.x_now = None
         self.y_now = None
@@ -143,9 +145,9 @@ class SuperModel(nn.Module):
             scale_vect(vnext, max_vect_comp(vnext, maxabs=True))
             vprev = vnext # agf_vhp makes a new copy, whew....
             vnext = self.vH(v=vnext)
-            dtht = angle_vect(vnext, vprev)
+            dtht = cos_angle_vect(vnext, vprev)
             
-            if (dtht % np.pi) < self.allowed_angular_error:
+            if torch.abs(torch.abs(dtht) - 1) < self.allowed_angular_error:
                 break
             elif count > 1000:
                 print('ACK! Too many iterations  in max_eigen_H...')
@@ -170,10 +172,10 @@ class SuperModel(nn.Module):
             scale_vect(decr, -1/lambda_max)
             
             vnext = add_vect(self.vH(v=vprev), decr)
-            dtht = angle_vect(vnext, vprev)
+            dtht = cos_angle_vect(vnext, vprev)
             print('dtht is',dtht)
             
-            if (dtht % np.pi) < self.allowed_angular_error:
+            if torch.abs(torch.abs(dtht) - 1) < self.allowed_cos_error:
                 break
             elif count > 1000:
                 print('ACK! Too many iterations  in min_eigen_H...')
@@ -230,7 +232,8 @@ def store_inputs(self, x):
     # Anyway, this is the forward_pre_hook that is registered at
     #   instantiation. 
     self.x_now = x[0] # get rid of unused extra arg included in hook call
-    if self.default_v is None:
+    
+    if self.default_v is None:  # just a startup issue: need to know shape
         self.default_v = tuple([torch.ones_like(p.clone().detach()) \
                                       for p in self.parameters()])
 
@@ -310,6 +313,11 @@ def angle_vect(a,b):
     cos_ab = dot_vect(a,b)/torch.sqrt(dot_vect(a,a)*dot_vect(b,b))
     
     return torch.acos(cos_ab)
+
+def cos_angle_vect(a,b):
+    cos_ab = dot_vect(a,b)/torch.sqrt(dot_vect(a,a)*dot_vect(b,b))
+    
+    return cos_ab
     
 def dict_to_tuple(d):
     t = []
