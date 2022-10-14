@@ -48,6 +48,10 @@ class SuperModel(nn.Module):
         super().__init__()
         self.default_v = None
         self.register_forward_pre_hook(store_inputs)
+        self.allowed_angular_error = 0.0001 # radians
+        self.no_warning = False
+        self.x_now = None
+        self.y_now = None
 
     def is_functional(self):
         return len(tuple(self.parameters())) == 0
@@ -78,7 +82,7 @@ class SuperModel(nn.Module):
             if v.grad is not None:
                 v.grad[:] = 0.0
        
-    def vH(self, v=None, *targs):  # easy interface to vector-Hessian product. 
+    def vH(self, v=None):  # easy interface to vector-Hessian product. 
         # You can multiply any vector v into the Hessian, but....
         if v is None:
             v = self.default_v  # just 1's, shaped like params.
@@ -93,7 +97,16 @@ class SuperModel(nn.Module):
                 # self.restore_model()  # Does NOT work with this line in place
             
             pred = self.forward(self.x_now)
-            loss = self.objective(pred, *targs)    
+            
+            # if len(targs) == 0 and self.no_warning is False:
+            #     self.no_warning = True
+            #     print('When calling SuperModel.vH(), you must include any')
+            #     print('targets that are needed to evaluate the loss function.')
+            #     print('I have no way to check that you have sent the right')
+            #     print('targets for a given input. So be careful!')
+            #     _ = input('Hit enter to continue...')
+                
+            loss = self.objective(pred, self.y_now)    
             
             self.zero_grad()
             
@@ -132,7 +145,7 @@ class SuperModel(nn.Module):
             vnext = self.vH(v=vnext)
             dtht = angle_vect(vnext, vprev)
             
-            if (dtht % np.pi) < 0.0001:
+            if (dtht % np.pi) < self.allowed_angular_error:
                 break
             elif count > 1000:
                 print('ACK! Too many iterations  in max_eigen_H...')
@@ -160,7 +173,7 @@ class SuperModel(nn.Module):
             dtht = angle_vect(vnext, vprev)
             print('dtht is',dtht)
             
-            if (dtht % np.pi) < 0.0001:
+            if (dtht % np.pi) < self.allowed_angular_error:
                 break
             elif count > 1000:
                 print('ACK! Too many iterations  in min_eigen_H...')

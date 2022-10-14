@@ -110,6 +110,8 @@ class trainer():
         else:
             self.criterion = nn.MSELoss()
 
+        self.model.set_criterion(self.criterion)
+        
         self.optimizer_type = optim.SGD
         self.optimizer = self.optimizer_type(self.model.parameters(), lr=1e-5)
         self.eps = 0.001 # percent reduction in loss function at each iteration. 
@@ -291,9 +293,13 @@ class trainer():
     def get_more_data(self):
         x,y = self.data_generator()
         try:
-            return x.to(self.device), y.to(self.device)
+            x, y = x.to(self.device), y.to(self.device)
         except AttributeError:
-            return x.to(self.device), y
+            x, y = x.to(self.device), y
+        # Can I put x and y into the model for use in Hessian stuff here? 
+        self.model.x_now = x
+        self.model.y_now = y
+        return x, y
     
     def zap_history(self):
         state = self.pause
