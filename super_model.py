@@ -153,8 +153,10 @@ class SuperModel(nn.Module):
                 print('ACK! Too many iterations  in max_eigen_H...')
                 return None
         
-        lambda_max = torch.sqrt(dot_vect(vnext, vnext)/ \
-                                dot_vect(vprev, vprev)).item()
+        vHmax = vnext
+        sign = torch.sign(dot_vect(vHmax,vprev))
+        lambda_max = sign*torch.sqrt(dot_vect(vnext, vnext)/ \
+                                     dot_vect(vprev, vprev)).item()
             
         return vnext, lambda_max
 
@@ -181,8 +183,11 @@ class SuperModel(nn.Module):
                 print('ACK! Too many iterations  in min_eigen_H...')
                 return None
         
+        vHmin = vnext
+        sign = torch.sign(dot_vect(vHmin,vprev))
         lambda_min = torch.sqrt(dot_vect(vnext, vnext)/ \
                                 dot_vect(vprev, vprev)).item()
+        lambda_min = sign*lambda_min + lambda_max
             
         return vnext, lambda_min
 
