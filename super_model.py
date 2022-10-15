@@ -60,9 +60,9 @@ class SuperModel(nn.Module):
 
     def make_functional(self):
         orig_params = tuple(self.parameters())
-        if self.default_v is None:
-            self.default_v = tuple([torch.ones_like(p.clone().detach()) \
-                                          for p in self.parameters()])
+        # if self.default_v is None:
+        #     self.default_v = tuple([torch.ones_like(p.clone().detach()) \
+        #                                   for p in self.parameters()])
 
         orig_grad = self.capture_gradients()
         # Remove all the parameters in the model, because reasons. 
@@ -129,6 +129,9 @@ class SuperModel(nn.Module):
             torch.autograd.functional.vhp(loss_wrt_params,
                                           params2pass,
                                           v, strict=True)
+            
+        self.restore_model()
+        
         return v_dot_hessian
 
         
@@ -175,7 +178,6 @@ class SuperModel(nn.Module):
             
             vnext = add_vect(self.vH(v=vprev), decr)
             dtht = cos_angle_vect(vnext, vprev)
-            print('dtht is',dtht)
             
             if torch.abs(torch.abs(dtht) - 1) < self.allowed_cos_error:
                 break
@@ -227,7 +229,28 @@ class SuperModel(nn.Module):
                 next_entry = {knext: None}
             g.update(next_entry)
         return g
-
+    
+    def report(self):
+        if self.y_now is None:
+            print('Need to define targets before calling report().')
+            
+        vmax, lmax = self.max_eigen_H()
+        vmin, lmin = self.min_eigen_H(lmax)
+        g = dict_to_tuple(self.capture_gradients())
+        
+        rad2deg = 180/np.pi
+        g2max = angle_vect(g, vmax)*rad2deg
+        g2min = angle_vect(g, vmin)*rad2deg
+        max2min = angle_vect(vmax, vmin)*rad2deg
+        
+        print('\n\n===========================================\n')
+        print('Max eigenvalue:',lmax)
+        print('Min eigenvalue:',lmin)
+        
+        print('grad to vmax',g2max)
+        print('grad to vmin',g2min)
+        print('vmin to vmax',max2min)
+        print('============================================\n\n')
 
 def store_inputs(self, x): 
     # How is self defined here? This does work! I just don't get why. The
@@ -329,9 +352,7 @@ def dict_to_tuple(d):
     for k,v in d.items():
         t.append(v)
     return tuple(t)
-        
 
-    
 if __name__ == "__main__":
     
     torch.manual_seed(0)
