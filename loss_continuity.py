@@ -42,6 +42,8 @@ import copy
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
+
+from super_model import dict_to_tuple
 # from torch import optim
 # from torch.autograd.functional import vhp as VHP
 
@@ -229,6 +231,7 @@ if __name__=="__main__":
     optimizer.step()
     newpred = model(example)
     
+    # assert(1==0)
     
     outs = {\
             'saved loss': lsave,
@@ -363,6 +366,49 @@ if __name__=="__main__":
     s0 = copy.deepcopy(sdsave)
     reset_model(model, sdsave, gsave)
     alpha0 = param_dict_vector(model)
+    
+    _ = tvt.get_more_data() # needed to set targets in model
+    print('before training:')
+    print('grad norm is', normsq_grad(model))
+    model.report()
+    # assert(1==0)
+    # _ = model.vH() # causes grad to grow forever
+    # calling vH just once means that in future train_step calls, aparently
+    # the gradient is never zero'd again. WHy? 
+    #
+    # I can do train_step() calls by hand, and I see that the normsq_grad() return 
+    #   value begins increasing fairly quickly after a vH() call. This seems to 
+    #   legitimately reflect increases in the grad attributes. (I capture them 
+    #   via capture_gradients()). But what stops happening is optimizer.zero_grad().
+    #   WHY?!
+    #
+    # 17-Oct-2022 I figured this out I think. I can put the optimizer and model 
+    #   params in lists; the are equal at first. Then, after a 
+    #   call to vH, the model param ids have changed, while the optimizer 
+    #   param ids remain the same. 
+    #
+    #   So, the optimizer still adjusts the same param set, while the params of
+    #   the model remain untouched. Since the gradients are attributes of 
+    #   these imposter params, the optimizer also leaves those untouched: in
+    #   particular, it never zeros them since it doesn't know about them.  
+    #
+    #   But backward() knows! Backward() keeps incrementing the grads of the 
+    #   imposter params, so they grow forever. 
+    #
+    #   Backward() just references whatever is in the model when it is called.
+    #   Optimizer only has access to whatever reference was passed to it when 
+    #   it was first created. 
+    #
+    #   So this is a weird problem in which "the gradient" grew forever, but 
+    #   "the model params" never changed! So there had to be two param sets,
+    #   probably because I copied somewhere when I should have moved a pointer.
+     
+    
+    # model.report() # this kills parameter updates!
+    # reset_model(model, sdsave, gsave) # this does not help!
+    # _ = dict_to_tuple(model.capture_gradients()) # does not kill updates?
+    # vmax, lmax = model.max_eigen_H() # zeros gradient! 
+
     print('Training model with', count_params(model), 'parameters.')
     while is_power_law and (i < niter):
         if i % 100 == 0:
@@ -393,7 +439,10 @@ if __name__=="__main__":
         gp2, gp1, g0 = gp1, g0, g1
         alpha0 = alpha1
         i += 1
-        
+    
+    print('after training:')
+    model.report()
+    
     istop = i
     loss_history = loss_history[0:istop]
     grad_history = grad_history[0:istop]

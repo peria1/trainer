@@ -25,7 +25,7 @@ it corresponds.
 I do not understand how this works in detail. But basically, to use the 
 autograd.functional methods, we need to be looking at derivatives with 
 respect to inputs, not model parameters. So we need to wrap the function 
-that we are training in a function that takes the model parameters as its 
+that we are training in a function that takes only the model parameters as its 
 inputs. 
 
 Furthermore, whenever we want to calculate something with autograd.functional, 
@@ -48,6 +48,8 @@ class SuperModel(nn.Module):
         super().__init__()
         self.default_v = None
         self.register_forward_pre_hook(store_inputs)
+        
+        self.max_iterations = 10000
         self.allowed_angular_error = 0.001 # radians
         self.allowed_cos_error = 1-np.cos(self.allowed_angular_error)
         print(self.allowed_cos_error)
@@ -55,17 +57,27 @@ class SuperModel(nn.Module):
         self.x_now = None
         self.y_now = None
 
+    def param_id_list(self):
+        plist = []
+        for p in self.parameters():
+            plist.append(id(p))
+        return plist
+    
     def is_functional(self):
         return len(tuple(self.parameters())) == 0
 
     def make_functional(self):
         orig_params = tuple(self.parameters())
-        # if self.default_v is None:
-        #     self.default_v = tuple([torch.ones_like(p.clone().detach()) \
-        #                                   for p in self.parameters()])
-
-        orig_grad = self.capture_gradients()
-        # Remove all the parameters in the model, because reasons. 
+        
+        # print('PARAMETER REFERENCES ARE KEPT?')
+        # This pumps out True a bajillion times...
+        # for op, sp in zip(orig_params, self.parameters()):
+        #     print(op==sp)
+        #
+        # So, orig_params is a tuple of references to the original model params
+            
+        # orig_grad = self.capture_gradients()
+        # Remove all the parameters from the model, because reasons. 
         names = []
         for name, p in list(self.named_parameters()):
             del_attr(self, name.split("."))
@@ -73,8 +85,53 @@ class SuperModel(nn.Module):
             
         self.names = names
         self.orig_params = orig_params
-        self.orig_grad = orig_grad
+        # self.curr_grad = orig_grad
         
+    def load_weights(self, names, params, as_params=False):
+        for name, p in zip(names, params):
+            if not as_params:
+                set_attr(self, name.split("."), p)
+            else:
+                set_attr(self, name.split("."), torch.nn.Parameter(p))
+    
+    # def restore_model(self, orig=False): # (this one is mine)
+    #     if not self.is_functional():
+    #         return  # no need to restore....
+        
+    #     self.load_weights(self.names, self.orig_params, as_params=True)
+        
+    #     if orig:
+    #         grad = self.orig_grad
+    #     else:
+    #         grad = self.curr_grad
+            
+    #     for k, v in self.named_parameters():
+    #         kg = k + '.grad'
+    #         if grad[kg] is not None:
+    #             v.grad = grad[kg].clone().detach()
+    #         else:
+    #             v.grad = None
+                
+    
+    #  # returns gradients in dict vector form (this one is also mine)
+    def capture_gradients(self):
+        if self.is_functional():
+            self.load_weights(self.names, \
+                              self.orig_params, \
+                                  as_params=False) 
+            # self.restore_model()
+        g = {}
+        for k, v in self.named_parameters():
+            gnext = v.grad
+            knext = k + '.grad'
+            if gnext is not None:
+                next_entry = {knext: gnext.clone().detach()}
+            else:
+                next_entry = {knext: None}
+            g.update(next_entry)
+        return g
+    
+    
     def set_criterion(self, objective):
         assert callable(objective)
         self.objective = objective
@@ -89,14 +146,14 @@ class SuperModel(nn.Module):
         if v is None:
             v = self.default_v  # just 1's, shaped like params.
 
+        # self.orig_grad = self.capture_gradients()
         # This is the loss function that allows Hessian computations
         #   with respect to parameters rather than input. It wraps
         #   whatever loss function we are training (self.objective), via
         #   this SuperModel class. 
         def loss_wrt_params(*new_params):
             if self.is_functional:
-                self.load_weights(self.names, new_params) # Weird! We removed the params before. 
-                # self.restore_model()  # Does NOT work with this line in place
+                self.load_weights(self.names, new_params, as_params=False) # Weird! We removed the params before. 
             
             pred = self.forward(self.x_now)
             
@@ -121,7 +178,7 @@ class SuperModel(nn.Module):
         params2pass = tuple(p.detach().requires_grad_() for p in self.orig_params)
     
         _ = loss_wrt_params(*self.orig_params) # Unpatched inside function...
-        _ = self.capture_gradients()
+        # _ = self.capture_gradients()
 
         self.make_functional() # monkey-patching now complete. Wow.
 
@@ -130,7 +187,10 @@ class SuperModel(nn.Module):
                                           params2pass,
                                           v, strict=True)
             
-        self.restore_model()
+        self.load_weights(self.names, \
+                          self.orig_params, \
+                              as_params=False) 
+        # self.restore_model(orig=True) # did I botch this with grad stuff??
         
         return v_dot_hessian
 
@@ -150,9 +210,11 @@ class SuperModel(nn.Module):
             vnext = self.vH(v=vnext)
             dtht = cos_angle_vect(vnext, vprev)
             
+            if count % 50 == 0:
+                print('dtht=',dtht)
             if torch.abs(torch.abs(dtht) - 1) < self.allowed_angular_error:
                 break
-            elif count > 1000:
+            elif count > self.max_iterations:
                 print('ACK! Too many iterations  in max_eigen_H...')
                 return None
         
@@ -181,7 +243,7 @@ class SuperModel(nn.Module):
             
             if torch.abs(torch.abs(dtht) - 1) < self.allowed_cos_error:
                 break
-            elif count > 1000:
+            elif count > self.max_iterations:
                 print('ACK! Too many iterations  in min_eigen_H...')
                 return None
         
@@ -194,41 +256,6 @@ class SuperModel(nn.Module):
         return vnext, lambda_min
 
     
-    def load_weights(self, names, params, as_params=False):
-        for name, p in zip(names, params):
-            if not as_params:
-                set_attr(self, name.split("."), p)
-            else:
-                set_attr(self, name.split("."), torch.nn.Parameter(p))
-    
-    def restore_model(self): # (this one is mine)
-        if not self.is_functional():
-            return  # no need to restore....
-        
-        self.load_weights(self.names, self.orig_params, as_params=True)
-        
-        grad = self.orig_grad
-        for k, v in self.named_parameters():
-            kg = k + '.grad'
-            if grad[kg] is not None:
-                v.grad = grad[kg].clone().detach()
-            else:
-                v.grad = None
-    
-     # returns gradients in dict vector form (this one is also mine)
-    def capture_gradients(self):
-        if self.is_functional():
-            self.restore_model()
-        g = {}
-        for k, v in self.named_parameters():
-            gnext = v.grad
-            knext = k + '.grad'
-            if gnext is not None:
-                next_entry = {knext: gnext.clone().detach()}
-            else:
-                next_entry = {knext: None}
-            g.update(next_entry)
-        return g
     
     def report(self):
         if self.y_now is None:
@@ -375,12 +402,12 @@ if __name__ == "__main__":
     mlp.objective = lambda x : torch.sum(x**2)
     
     out = mlp(xglobal)  
-    print('grads before eigs', mlp.capture_gradients())
+    # print('grads before eigs', mlp.capture_gradients())
 
 
     v_eig, lambda_max = mlp.max_eigen_H()
 
-    grad_tuple = dict_to_tuple(mlp.capture_gradients())
+    # grad_tuple = dict_to_tuple(mlp.capture_gradients())
     print('grad_tuple is', grad_tuple)
     
     print("eigenvector is", v_eig)

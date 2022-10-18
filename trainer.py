@@ -134,6 +134,7 @@ class trainer():
         self.model.train()  # make sure model is in training mode
         
         self.optimizer.zero_grad()  # Make the gradients zero to start the step.
+
         pred = self.model(input)      #  Find the current predictions, yhat. 
         loss = self.criterion(pred, target)  
         loss.backward()      # Do back propagation! Thank you Pytorch!
