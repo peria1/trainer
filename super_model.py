@@ -405,6 +405,26 @@ if __name__ == "__main__":
 
     vmax, lmax = mlp.max_eigen_H()
     vmin, lmin = mlp.min_eigen_H(lmax)
+    
+    x0, x1, x2 = xglobal
+    H =2.0*torch.tensor(\
+       [[x0*x0, x1*x0, x2*x0,     0,     0,     0, x0,  0],\
+        [x1*x0, x1*x1, x2*x1,     0,     0,     0, x1,  0],
+        [x2*x0, x2*x1, x2*x2,     0,     0,     0, x2,  0],
+        [    0,     0,     0, x0*x0, x1*x0, x2*x0,  0, x0],
+        [    0,     0,     0, x1*x0, x1*x1, x2*x1,  0, x1],
+        [    0,     0,     0, x2*x0, x1*x2, x2*x2,  0, x2],
+        [   x0,    x1,    x2,     0,     0,     0,  1,  0],
+        [    0,     0,     0,    x0,    x1,    x2,  0,  1]])
+        
+    vpt = tuple(mlp.parameters())
+    vp = torch.tensor([vpt[0][0,0],vpt[0][0,1],vpt[0][0,2],
+                       vpt[0][1,0],vpt[0][1,1],vpt[0][1,2],
+                       vpt[1][0],vpt[1][1]])
+    
+    vpH = mlp.vH(v=vpt)
+    vpHchk = vp@H
+    
     # # grad_tuple = dict_to_tuple(mlp.capture_gradients())
     # print('grad_tuple is', grad_tuple)
     
