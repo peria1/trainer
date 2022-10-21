@@ -208,11 +208,11 @@ class SuperModel(nn.Module):
             scale_vect(vnext, max_vect_comp(vnext, maxabs=True))
             vprev = vnext # agf_vhp makes a new copy, whew....
             vnext = self.vH(v=vnext)
-            dtht = cos_angle_vect(vnext, vprev)
+            cos_dtht = cos_angle_vect(vnext, vprev)
             
             if count % 50 == 0:
-                print('dtht=',dtht)
-            if torch.abs(torch.abs(dtht) - 1) < self.allowed_angular_error:
+                print('cos_dtht=',cos_dtht)
+            if torch.abs(torch.abs(cos_dtht) - 1) < self.allowed_angular_error:
                 break
             elif count > self.max_iterations:
                 print('ACK! Too many iterations  in max_eigen_H...')
@@ -221,7 +221,7 @@ class SuperModel(nn.Module):
         vHmax = vnext
         sign = torch.sign(dot_vect(vHmax,vprev))
         lambda_max = sign*torch.sqrt(dot_vect(vnext, vnext)/ \
-                                     dot_vect(vprev, vprev)).item()
+                                     dot_vect(vprev, vprev))
             
         return vnext, lambda_max
 
@@ -236,23 +236,20 @@ class SuperModel(nn.Module):
             vprev = vnext
             
             decr = copy.deepcopy(vprev)
-            scale_vect(decr, -1/lambda_max)
+            scale_vect(decr, -1/lambda_max) # scale_vect *divides*! in-place!
             
             vnext = add_vect(self.vH(v=vprev), decr)
-            dtht = cos_angle_vect(vnext, vprev)
+            cos_dtht = cos_angle_vect(vnext, vprev)
             
-            if torch.abs(torch.abs(dtht) - 1) < self.allowed_cos_error:
+            if torch.abs(torch.abs(cos_dtht) - 1) < self.allowed_cos_error:
                 break
             elif count > self.max_iterations:
                 print('ACK! Too many iterations  in min_eigen_H...')
                 return None
         
-        vHmin = vnext
-        sign = torch.sign(dot_vect(vHmin,vprev))
-        lambda_min = torch.sqrt(dot_vect(vnext, vnext)/ \
-                                dot_vect(vprev, vprev)).item()
-        lambda_min = sign*lambda_min + lambda_max
-            
+        lmin_minus_lmax = dot_vect(vnext, vprev)/dot_vect(vprev,vprev)
+        lambda_min = lmin_minus_lmax + lambda_max
+                  
         return vnext, lambda_min
 
     
@@ -393,72 +390,73 @@ if __name__ == "__main__":
 
         def forward(self, x):
             '''Forward pass'''
-            return torch.sigmoid(self.layers(x))
+            return self.layers(x)
 
     in_dim, out_dim = 3, 2
     xglobal = torch.rand((in_dim,)) 
 
     mlp = SimpleMLP(in_dim, out_dim) 
-    mlp.objective = lambda x : torch.sum(x**2)
+    mlp.objective = lambda x,y : torch.sum((x-y)**2)
     
     out = mlp(xglobal)  
+    mlp.y_now = torch.randn_like(out)
     # print('grads before eigs', mlp.capture_gradients())
 
 
-    v_eig, lambda_max = mlp.max_eigen_H()
+    vmax, lmax = mlp.max_eigen_H()
+    vmin, lmin = mlp.min_eigen_H(lmax)
+    # # grad_tuple = dict_to_tuple(mlp.capture_gradients())
+    # print('grad_tuple is', grad_tuple)
+    
+    # print("eigenvector is", v_eig)
+    # print('angle between eigenvector and gradient is', \
+    #       int(angle_vect(grad_tuple, v_eig)*180/np.pi),'degrees.')
+        
+    # print('Largest eigenvalue of the Hessian is', lambda_max)
 
-    # grad_tuple = dict_to_tuple(mlp.capture_gradients())
-    print('grad_tuple is', grad_tuple)
+    # gradmag = torch.sqrt(dot_vect(grad_tuple, grad_tuple)).item()
+    # print('gradient magnitude is', gradmag)
     
-    print("eigenvector is", v_eig)
-    print('angle between eigenvector and gradient is', \
-          int(angle_vect(grad_tuple, v_eig)*180/np.pi),'degrees.')
-        
-    print('Largest eigenvalue of the Hessian is', lambda_max)
-
-    gradmag = torch.sqrt(dot_vect(grad_tuple, grad_tuple)).item()
-    print('gradient magnitude is', gradmag)
-    
-    vhpmag = torch.sqrt(dot_vect(v_eig, v_eig)).item()
-    print('VHP magnitude is', vhpmag)
+    # vhpmag = torch.sqrt(dot_vect(v_eig, v_eig)).item()
+    # print('VHP magnitude is', vhpmag)
     
     
-    vunit = copy.deepcopy(v_eig)
-    norm_vect(vunit)
-    vuH = mlp.vH(vunit)
+    # vunit = copy.deepcopy(v_eig)
+    # norm_vect(vunit)
+    # vuH = mlp.vH(vunit)
         
     
-    fpp = torch.sqrt(dot_vect(vuH, vuH))    
-    # this is the step size, in the vunit direction, that should bring 
-    #   the gradient magnitude to zero, if the gradient varies linearly. 
-    # It's delta_x = y_now/slope...a step that big should bring y to zero. 
-    scale = gradmag/fpp  
-    print('Expect zero gradient after step of',scale.item())
+    # fpp = torch.sqrt(dot_vect(vuH, vuH))    
+    # # this is the step size, in the vunit direction, that should bring 
+    # #   the gradient magnitude to zero, if the gradient varies linearly. 
+    # # It's delta_x = y_now/slope...a step that big should bring y to zero. 
+    # scale = gradmag/fpp  
+    # print('Expect zero gradient after step of',scale.item())
     
     
-    # The following shows that I can step and then step back, with plain
-    #   SGD. This is stepping along the gradient though, not in the max
-    #   eigen direction. 
+    # # The following shows that I can step and then step back, with plain
+    # #   SGD. This is stepping along the gradient though, not in the max
+    # #   eigen direction. 
     
-    if mlp.is_functional():
-        mlp.restore_model()
+    # if mlp.is_functional():
+    #     mlp.restore_model()
         
-    optimizer = torch.optim.SGD(mlp.parameters(), lr=1e-3)
+    # optimizer = torch.optim.SGD(mlp.parameters(), lr=1e-3)
     
-    loss0 = mlp.objective(mlp(xglobal))
-    print('Initial loss ', loss0.item())
+    # loss0 = mlp.objective(mlp(xglobal))
+    # print('Initial loss ', loss0.item())
    
-    optimizer.step()
+    # optimizer.step()
 
-    # Get updated loss
-    out1 = mlp(xglobal)
-    loss1 = mlp.objective(out1)
-    print('Updated loss ', loss1.item())
+    # # Get updated loss
+    # out1 = mlp(xglobal)
+    # loss1 = mlp.objective(out1)
+    # print('Updated loss ', loss1.item())
 
-    # Use negative lr to revert loss
-    optimizer.param_groups[0]['lr'] = -1. * optimizer.param_groups[0]['lr']
+    # # Use negative lr to revert loss
+    # optimizer.param_groups[0]['lr'] = -1. * optimizer.param_groups[0]['lr']
     
-    optimizer.step()
-    out2 = mlp(xglobal)
-    loss2 = mlp.objective(out2)
-    print('Reverted loss ', loss2.item())
+    # optimizer.step()
+    # out2 = mlp(xglobal)
+    # loss2 = mlp.objective(out2)
+    # print('Reverted loss ', loss2.item())
