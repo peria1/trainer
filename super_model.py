@@ -222,7 +222,9 @@ class SuperModel(nn.Module):
         sign = torch.sign(dot_vect(vHmax,vprev))
         lambda_max = sign*torch.sqrt(dot_vect(vnext, vnext)/ \
                                      dot_vect(vprev, vprev))
-            
+
+        scale_vect(vnext, max_vect_comp(vnext, maxabs=True))
+
         return vnext, lambda_max
 
     def min_eigen_H(self, lambda_max):
@@ -250,6 +252,7 @@ class SuperModel(nn.Module):
         lmin_minus_lmax = dot_vect(vnext, vprev)/dot_vect(vprev,vprev)
         lambda_min = lmin_minus_lmax + lambda_max
                   
+        scale_vect(vnext, max_vect_comp(vnext, maxabs=True))
         return vnext, lambda_min
 
     
@@ -392,19 +395,39 @@ if __name__ == "__main__":
             '''Forward pass'''
             return self.layers(x)
 
+    class LessSimple(SuperModel):
+        def __init__(self, in_dim, out_dim):
+            super().__init__()
+            self.layers = nn.Sequential(
+                nn.Linear(in_dim, out_dim),
+            )
+
+        def forward(self, x):
+            '''Forward pass'''
+            return torch.sigmoid(self.layers(x))
+        
+    
     in_dim, out_dim = 3, 2
     xglobal = torch.rand((in_dim,)) 
 
     mlp = SimpleMLP(in_dim, out_dim) 
     mlp.objective = lambda x,y : torch.sum((x-y)**2)
     
+    hmlp = LessSimple(in_dim, out_dim)
+    hmlp.objective = lambda x,y : torch.sum((x-y)**2)
+    
     out = mlp(xglobal)  
     mlp.y_now = torch.randn_like(out)
+    
+    outh = hmlp(xglobal)
+    hmlp.y_now = mlp.y_now
     # print('grads before eigs', mlp.capture_gradients())
 
 
     vmax, lmax = mlp.max_eigen_H()
     vmin, lmin = mlp.min_eigen_H(lmax)
+    
+    mlp.report()
     
     x0, x1, x2 = xglobal
     H =2.0*torch.tensor(\
@@ -424,6 +447,21 @@ if __name__ == "__main__":
     
     vpH = mlp.vH(v=vpt)
     vpHchk = vp@H
+    
+    hvmax, hlmax = hmlp.max_eigen_H()
+    hvmin, hlmin = hmlp.min_eigen_H(hlmax)
+    
+    vHmax = hmlp.vH(v=hvmax)
+    print('hvmax', hvmax)
+    scale_vect(hvmax,-1/hlmax)
+    print('Hv - lv', add_vect(vHmax, hvmax))
+    
+    vHmin = hmlp.vH(v=hvmin)
+    print('hvmin', hvmin)
+    scale_vect(hvmin,-1/hlmin)
+    print('Hv - lv', add_vect(vHmin, hvmin))
+    
+    
     
     # # grad_tuple = dict_to_tuple(mlp.capture_gradients())
     # print('grad_tuple is', grad_tuple)
