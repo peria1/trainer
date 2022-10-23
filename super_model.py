@@ -46,7 +46,6 @@ from torch import nn
 class SuperModel(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__()
-        self.default_v = None
         self.register_forward_pre_hook(store_inputs)
         
         self.max_iterations = 10000
@@ -54,6 +53,9 @@ class SuperModel(nn.Module):
         self.allowed_cos_error = 1-np.cos(self.allowed_angular_error)
         print(self.allowed_cos_error)
         self.no_warning = False
+
+        self.default_v = None
+        self.hessian = None
         self.x_now = None
         self.y_now = None
 
@@ -131,6 +133,12 @@ class SuperModel(nn.Module):
             g.update(next_entry)
         return g
     
+    def count_params(self):
+        count = 0
+        prod, T = torch.prod, torch.tensor
+        for p in self.parameters():
+            count += prod(T(p.shape))
+        return count.item()
     
     def set_criterion(self, objective):
         assert callable(objective)
@@ -140,8 +148,55 @@ class SuperModel(nn.Module):
         for v in self.parameters():
             if v.grad is not None:
                 v.grad[:] = 0.0
+    
+    def flatten_v(self, vt=None):
+        if vt is None:
+            return flatten_p()
+        
+        vf = None
+        for v in vt:
+            if vf is None:
+                vf = torch.flatten(v)
+            else:
+                vf = torch.cat((vf, torch.flatten(v)))
+        return vf        
+        
+        
+    def flatten_p(self):
+        pf = None
+        for p in self.parameters():
+            if pf is None:
+                pf = torch.flatten(p)
+            else:
+                pf = torch.cat((pf, torch.flatten(p)))
+        return pf        
+        
+# vfmin = torch.cat((torch.flatten(vmin[0]),torch.flatten(vmin[1])))
+
+    def flatten_H(self, Ht):
+        N = self.count_params()
+        H = torch.zeros(N, N)
+        ps = [p.shape for p in self.parameters()]
+
+        top,left = 0,0
+        for i,si in enumerate(ps):
+            for j,sj in enumerate(ps):
+                h = copy.deepcopy(Ht[i][j])
+                h = torch.flatten(h, end_dim=len(si)-1)
+                h = torch.flatten(h, start_dim=1)
+                
+                height, width = h.shape
+                H[top:(top+height), left:(left+width)] = h
+                left = (left + width) % N
+                
+            top += height
+        
+        
+        
+        return H
+        
        
-    def vH(self, v=None):  # easy interface to vector-Hessian product. 
+    def vH(self, v=None, get_hessian=False):  # easy interface to vector-Hessian product. 
         # You can multiply any vector v into the Hessian, but....
         if v is None:
             v = self.default_v  # just 1's, shaped like params.
@@ -186,6 +241,13 @@ class SuperModel(nn.Module):
             torch.autograd.functional.vhp(loss_wrt_params,
                                           params2pass,
                                           v, strict=True)
+            
+        if get_hessian:
+            self.hessian = \
+            torch.autograd.functional.hessian(loss_wrt_params,
+                                              params2pass, 
+                                              strict=True)
+            # self.hessian = self.flatten_H(Ht)
             
         self.load_weights(self.names, \
                           self.orig_params, \
@@ -460,7 +522,6 @@ if __name__ == "__main__":
     print('hvmin', hvmin)
     scale_vect(hvmin,-1/hlmin)
     print('Hv - lv', add_vect(vHmin, hvmin))
-    
     
     
     # # grad_tuple = dict_to_tuple(mlp.capture_gradients())
