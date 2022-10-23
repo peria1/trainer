@@ -151,7 +151,7 @@ class SuperModel(nn.Module):
     
     def flatten_v(self, vt=None):
         if vt is None:
-            return flatten_p()
+            return self.flatten_p()
         
         vf = None
         for v in vt:
