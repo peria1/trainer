@@ -317,7 +317,33 @@ class SuperModel(nn.Module):
         scale_vect(vnext, max_vect_comp(vnext, maxabs=True))
         return vnext, lambda_min
 
+    def line_scan(self, vhat, length=1, npts=100, symmetric=True):
+        sd0 = self.state_dict()
+        sd1 = copy.deepcopy(sd0)
+        vhat0 = copy.deepcopy(vhat)
+        norm_vect(vhat)
+        dp = copy.deepcopy(vhat)
+        scale_vect(dp, npts/length)
+        
+        if symmetric:
+            scale_vect(vhat, 2.0/length)
+            for k,vhatk in zip(sd1.keys(), vhat):
+                sd1[k] -= vhatk
+            scale_vect(vhat, 0.5*length)
+        
+        lchk = torch.zeros(npts)
+        for i in range(npts):
+            for k,dpi in zip(sd1.keys(), dp):
+                sd1[k]+=dpi
+                self.load_state_dict(sd1)
+            lchk[i]=self.objective(self(self.x_now), self.y_now)
     
+        self.load_state_dict(sd0)
+        vhat = copy.deepcopy(vhat0)
+        
+        x = torch.linspace(-length/2.0, length/2.0, npts)
+        
+        return x, lchk
     
     def report(self):
         if self.y_now is None:
