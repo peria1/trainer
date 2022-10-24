@@ -318,8 +318,11 @@ class SuperModel(nn.Module):
         return vnext, lambda_min
 
     def line_scan(self, vhat, length=1, npts=100, symmetric=True):
-        sd0 = self.state_dict()
-        sd1 = copy.deepcopy(sd0)
+        sdadj = self.state_dict() # sdadj points to state_dict inside model
+                                # sdadj will be overwritten if I load 
+                                #   an altered state dict. Not what I thought! 
+
+        sdsave = copy.deepcopy(sdadj)   # sdsave is safe from load_state_dict()
         vhat0 = copy.deepcopy(vhat)
         norm_vect(vhat)
         dp = copy.deepcopy(vhat)
@@ -327,22 +330,21 @@ class SuperModel(nn.Module):
         
         if symmetric:
             scale_vect(vhat, 2.0/length)
-            for k,vhatk in zip(sd1.keys(), vhat):
-                sd1[k] -= vhatk
+            for k,vhatk in zip(sdsave.keys(), vhat):
+                sdadj[k] -= vhatk
             scale_vect(vhat, 0.5*length)
         
         lchk = torch.zeros(npts)
         for i in range(npts):
-            for k,dpi in zip(sd1.keys(), dp):
-                sd1[k]+=dpi
-                self.load_state_dict(sd1)
+            for k,dpi in zip(sdsave.keys(), dp):
+                sdadj[k]+=dpi
+            self.load_state_dict(sdadj)
             lchk[i]=self.objective(self(self.x_now), self.y_now)
     
-        self.load_state_dict(sd0)
+        self.load_state_dict(sdsave)
         vhat = copy.deepcopy(vhat0)
         
         x = torch.linspace(-length/2.0, length/2.0, npts)
-        
         return x, lchk
     
     def report(self):
