@@ -267,7 +267,7 @@ class SuperModel(nn.Module):
         count = 0
         while True:
             count += 1
-            scale_vect(vnext, max_vect_comp(vnext, maxabs=True))
+            scalar_mult(vnext, 1./max_vect_comp(vnext, maxabs=True))
             vprev = vnext # agf_vhp makes a new copy, whew....
             vnext = self.vH(v=vnext)
             cos_dtht = cos_angle_vect(vnext, vprev)
@@ -285,7 +285,7 @@ class SuperModel(nn.Module):
         lambda_max = sign*torch.sqrt(dot_vect(vnext, vnext)/ \
                                      dot_vect(vprev, vprev))
 
-        scale_vect(vnext, max_vect_comp(vnext, maxabs=True))
+        scalar_mult(vnext, 1./max_vect_comp(vnext, maxabs=True))
 
         return vnext, lambda_max
 
@@ -296,11 +296,11 @@ class SuperModel(nn.Module):
         count = 0
         while True:
             count += 1
-            scale_vect(vnext, max_vect_comp(vnext, maxabs=True))
+            scalar_mult(vnext, 1./max_vect_comp(vnext, maxabs=True))
             vprev = vnext
             
             decr = copy.deepcopy(vprev)
-            scale_vect(decr, -1/lambda_max) # scale_vect *divides*! in-place!
+            scalar_mult(decr, -lambda_max) # scalar_mult works in-place!
             
             vnext = add_vect(self.vH(v=vprev), decr)
             cos_dtht = cos_angle_vect(vnext, vprev)
@@ -314,7 +314,7 @@ class SuperModel(nn.Module):
         lmin_minus_lmax = dot_vect(vnext, vprev)/dot_vect(vprev,vprev)
         lambda_min = lmin_minus_lmax + lambda_max
                   
-        scale_vect(vnext, max_vect_comp(vnext, maxabs=True))
+        scalar_mult(vnext, 1./max_vect_comp(vnext, maxabs=True))
         return vnext, lambda_min
 
     def line_scan(self, vhat, length=1, npts=100, symmetric=True):
@@ -326,25 +326,28 @@ class SuperModel(nn.Module):
         vhat0 = copy.deepcopy(vhat)
         norm_vect(vhat)
         dp = copy.deepcopy(vhat)
-        scale_vect(dp, npts/length)
+        scalar_mult(dp, length/(npts-1))
         
         if symmetric:
-            scale_vect(vhat, 2.0/length)
             for k,vhatk in zip(sdsave.keys(), vhat):
-                sdadj[k] -= vhatk
-            scale_vect(vhat, 0.5*length)
+                sdadj[k] -= vhatk/2.0
         
-        lchk = torch.zeros(npts)
-        for i in range(npts):
-            for k,dpi in zip(sdsave.keys(), dp):
-                sdadj[k]+=dpi
-            self.load_state_dict(sdadj)
-            lchk[i]=self.objective(self(self.x_now), self.y_now)
+        with torch.no_grad():
+            lchk = torch.zeros(npts)
+            for i in range(npts):
+                self.load_state_dict(sdadj)
+                lchk[i]=self.objective(self(self.x_now), self.y_now)
+                for k,dpi in zip(sdsave.keys(), dp):
+                    sdadj[k]+=dpi
+    
+            if symmetric:
+                x = torch.linspace(-length/2.0, length/2.0, npts)
+            else:
+                x = torch.linspace(0, length, npts)
     
         self.load_state_dict(sdsave)
         vhat = copy.deepcopy(vhat0)
         
-        x = torch.linspace(-length/2.0, length/2.0, npts)
         return x, lchk
     
     def report(self):
@@ -416,15 +419,15 @@ def max_vect_comp(x, maxabs=False):
         
     return maxv
 
-def scale_vect(x,a):  # IN-PLACE!! Returns None...
+def scalar_mult(x,a):  # IN-PLACE!! Returns None...
     try:
         for xi in x:
-            xi /= a
+            xi *= a
     except TypeError:
-        x /= a
+        x *= a
             
 def norm_vect(x):  # IN-PLACE!! Returns None...
-    scale_vect(x, torch.sqrt(dot_vect(x,x)))
+    scalar_mult(x, 1./torch.sqrt(dot_vect(x,x)))
 
 def dot_vect(a,b):
     adotb = 0.0
@@ -543,12 +546,12 @@ if __name__ == "__main__":
     
     vHmax = hmlp.vH(v=hvmax)
     print('hvmax', hvmax)
-    scale_vect(hvmax,-1/hlmax)
+    scalar_mult(hvmax,-hlmax)
     print('Hv - lv', add_vect(vHmax, hvmax))
     
     vHmin = hmlp.vH(v=hvmin)
     print('hvmin', hvmin)
-    scale_vect(hvmin,-1/hlmin)
+    scalar_mult(hvmin,-hlmin)
     print('Hv - lv', add_vect(vHmin, hvmin))
     
     
