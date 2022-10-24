@@ -317,6 +317,55 @@ class SuperModel(nn.Module):
         scalar_mult(vnext, 1./max_vect_comp(vnext, maxabs=True))
         return vnext, lambda_min
 
+    def raster_scan(self, vhatx, vhaty, length=1, npts=50, symmetric=True):
+        sdadj = self.state_dict() # sdadj points to state_dict inside model
+                                # sdadj will be overwritten if I load 
+                                #   an altered state dict. Not what I thought! 
+
+        sdsave = copy.deepcopy(sdadj)   # sdsave is safe from load_state_dict()
+        vhat0x = copy.deepcopy(vhatx)
+        vhat0y = copy.deepcopy(vhaty)
+        norm_vect(vhatx)
+        norm_vect(vhaty)
+        dpx = copy.deepcopy(vhatx)
+        dpy = copy.deepcopy(vhaty)
+        scalar_mult(dpx, length/(npts-1))
+        scalar_mult(dpy, length/(npts-1))
+        
+        if symmetric:
+            for k,vhatk in zip(sdsave.keys(), vhatx):
+                sdadj[k] -= vhatk/2.0
+            for k,vhatk in zip(sdsave.keys(), vhaty):
+                sdadj[k] -= vhatk/2.0
+        
+        with torch.no_grad():
+            lchk = torch.zeros(npts,npts)
+            for i in range(npts):
+                for j in range(npts):
+                    self.load_state_dict(sdadj)
+                    lchk[i,j]=self.objective(self(self.x_now), self.y_now)
+                    
+                    for k,dpi in zip(sdsave.keys(), dpx):
+                        sdadj[k]+=dpi
+                for i,k in enumerate(sdsave.keys()):
+                    sdadj[k]+=dpy[i]
+                    sdadj[k]-=(npts-1)*dpx[i]
+                
+    
+            if symmetric:
+                x = torch.linspace(-length/2.0, length/2.0, npts)
+                y = torch.linspace(-length/2.0, length/2.0, npts)
+            else:
+                x = torch.linspace(0, length, npts)
+                y = torch.linspace(0, length, npts)
+    
+        self.load_state_dict(sdsave)
+        vhatx = copy.deepcopy(vhat0x)
+        vhaty = copy.deepcopy(vhat0y)
+        x, y = np.meshgrid(x,y)
+        return x, y, lchk
+
+
     def line_scan(self, vhat, length=1, npts=100, symmetric=True):
         sdadj = self.state_dict() # sdadj points to state_dict inside model
                                 # sdadj will be overwritten if I load 
