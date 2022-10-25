@@ -224,6 +224,13 @@ class trainer_view():
                 d.fig.canvas.draw()
                 d.fig.canvas.flush_events()
 
+#   This function is just a hack for occasional iPython weirdness. 
+#   No button or anything, just a command-prompt nudge...
+    def show_active_displays(self):
+        for d in self.displays:
+            if d.active:
+                d.fig.show()
+
     def add_display(self, event):
         pass
 
