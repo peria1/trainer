@@ -260,7 +260,7 @@ class SuperModel(nn.Module):
     def ext_eigen_H(self):
         pass
         
-    def max_eigen_H(self):
+    def max_eigen_H(self): # direction and max absolute eigenvalue 
         v_dot_hessian = self.vH()
             
         vnext = copy.deepcopy(v_dot_hessian)
@@ -272,8 +272,8 @@ class SuperModel(nn.Module):
             vnext = self.vH(v=vnext)
             cos_dtht = cos_angle_vect(vnext, vprev)
             
-            if count % 50 == 0:
-                print('cos_dtht=',cos_dtht)
+            if count % 100 == 0:
+                print(count,'iterations, cos_dtht=',cos_dtht)
             if torch.abs(torch.abs(cos_dtht) - 1) < self.allowed_angular_error:
                 break
             elif count > self.max_iterations:
@@ -289,7 +289,9 @@ class SuperModel(nn.Module):
 
         return vnext, lambda_max
 
-    def min_eigen_H(self, lambda_max):
+    def min_eigen_H(self, lambda_max): # direction and eigenvalue for 
+                                        #   ooposite end of spectrum from 
+                                        #   max_eigen_H().
         v_dot_hessian = self.vH()
             
         vnext = copy.deepcopy(v_dot_hessian)
@@ -308,7 +310,7 @@ class SuperModel(nn.Module):
             if torch.abs(torch.abs(cos_dtht) - 1) < self.allowed_cos_error:
                 break
             elif count > self.max_iterations:
-                print('ACK! Too many iterations  in min_eigen_H...')
+                print('ACK! Too many iterations in min_eigen_H...',count)
                 return None
         
         lmin_minus_lmax = dot_vect(vnext, vprev)/dot_vect(vprev,vprev)
@@ -316,6 +318,15 @@ class SuperModel(nn.Module):
                   
         scalar_mult(vnext, 1./max_vect_comp(vnext, maxabs=True))
         return vnext, lambda_min
+
+    def eig_extremes(self):
+        vmax, lmax = self.max_eigen_H()
+        vmin, lmin = self.min_eigen_H(lmax)
+        
+        if lmax < lmin:
+            vmax, lmax, vmin, lmin = vmin, lmin, vmax, lmax 
+            
+        return (vmin, lmin), (vmax, lmax)
 
     def raster_scan(self, vhatx, vhaty, length=1, npts=50, symmetric=True):
         sdadj = self.state_dict() # sdadj points to state_dict inside model
@@ -420,6 +431,35 @@ class SuperModel(nn.Module):
         print('grad to vmin',g2min)
         print('vmin to vmax',max2min)
         print('============================================\n\n')
+        
+    def scales(self): # get L/dLdx gradient and dLdx/d2L/dx2 along max 
+                        # and min eig directions
+        L0 = self.objective(self(self.x_now), self.y_now)
+        dL = dict_to_tuple(self.capture_gradients())
+        
+        (vmin, lmin), (vmax, lmax) = self.eig_extremes()
+        scalar_mult(vmin, torch.sqrt(dot_vect(vmin, vmin)))
+        scalar_mult(vmax, torch.sqrt(dot_vect(vmax, vmax)))
+        
+        # d2min = self.vH(v=vmin) # don't need these, use eigenvalues
+        # d2max = self.vH(v=vmax)
+        
+        L_to_zero = L0/torch.sqrt(dot_vect(dL, dL))
+        dL_to_zero_mineig = dot_vect(dL, vmin)/lmin # these are 
+        dL_to_zero_maxeig = dot_vect(dL, vmax)/lmax #   eigens, yay! 
+        
+        scale_keys = ['L_to_zero', 'dL_to_zero_mineig', 'dL_to_zero_maxeig']
+        scale_vals = [L_to_zero, dL_to_zero_mineig, dL_to_zero_maxeig]
+        
+        scale_dict={}
+        for i,k in enumerate(scale_keys):
+            scale_dict.update({k: scale_vals[i]})
+            
+        return scale_dict
+        
+    
+        
+        
 
 def store_inputs(self, x): 
     # How is self defined here? This does work! I just don't get why. The
