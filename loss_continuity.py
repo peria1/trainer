@@ -326,7 +326,7 @@ if __name__=="__main__":
         assert(tvt.use_GAlr)
     except AssertionError:
         print('Oops, you turned off gradient-adaptive stepping...')
-        raise AssertionError
+        # raise AssertionError
     
     neps = 9
     eps = 10**np.linspace(-8,0,neps)
@@ -345,7 +345,7 @@ if __name__=="__main__":
         loss = tvt.criterion(model(example), target) # new loss
         Lratio[i] = -(loss.item()-saveloss.item())/saveloss.item() # should equal e
         
-    niter = 10000
+    niter = 2000
     loss_history = np.zeros(niter)
     grad_history = np.zeros(niter)
     gangle_history = np.zeros(niter)
@@ -410,7 +410,8 @@ if __name__=="__main__":
     # vmax, lmax = model.max_eigen_H() # zeros gradient! 
 
     print('Training model with', count_params(model), 'parameters.')
-    while is_power_law and (i < niter):
+    # while is_power_law and (i < niter):
+    while (i < niter):
         if i % 100 == 0:
             print(i,'...')
         example, target = tvt.get_more_data()
@@ -535,6 +536,25 @@ if __name__=="__main__":
         Lratio_now[i] = -(loss.item()-saveloss.item())/saveloss.item() # should equal e
 
 
+    vmax, lmax = model.max_eigen_H()
+    vmin, lmin = model.min_eigen_H(lmax)
+    
+    xpos, ypos = model.line_scan(vmax, length=1, npts=200)
+    xneg, yneg = model.line_scan(vmin, length=1, npts=200)
+    
+    plt.figure()
+    plt.plot(xpos, ypos)
+    plt.plot(xneg, yneg)
+
+    xr, yr, ras = model.raster_scan(vmin, vmax)
+    fig = plt.figure()
+    ax = plt.axes(projection='3d')
+    ax.plot_surface(xr, yr, ras.numpy(), rstride=1, cstride=1,
+                    cmap='viridis', edgecolor='none')
+    ax.set_title('loss in eig-extreme plane');
+    ax.set_xlabel('min eig: '+ str(lmin))
+    ax.set_xlabel('max eig: '+ str(lmax))
+    
     plt.ion()
     plt.show()
 
