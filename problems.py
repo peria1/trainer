@@ -58,9 +58,11 @@ class Problem():
             self.nbatch = 128
 
     def move_to_torch(self, inp, target):
-        inp = torch.from_numpy(inp).to(torch.float32)
-        target = torch.from_numpy(target).to(torch.float32)
-        return inp, target
+        # inp = torch.from_numpy(inp).to(torch.float32)
+        # target = torch.from_numpy(target).to(torch.float32)
+        # return inp, target
+        inp = torch.as_tensor(inp)
+        target = torch.as_tensor(target)
 
     def get_input_and_target(self):
         print('You must define your data generator.')
@@ -448,16 +450,29 @@ class roots_of_poly(Problem):
 
     def get_input_and_target(self):
     
-        x = np.random.normal(size=(self.nbatch,self.npts))
-        y = np.zeros_like(x); y = np.concatenate((y,y),axis=1)
+        # x = np.random.normal(size=(self.nbatch,self.npts))
+        # y = np.zeros_like(x); y = np.concatenate((y,y),axis=1)
         
-        xaug = np.concatenate((np.ones((self.nbatch,1)),x),axis=1)
-        for i in range(self.nbatch):
-            r = np.roots(xaug[i,:])
-            y[i,0:self.npts] = np.real(r)
-            y[i,self.npts:] = np.imag(r)
+        # xaug = np.concatenate((np.ones((self.nbatch,1)),x),axis=1)
+        # for i in range(self.nbatch):
+        #     r = np.roots(xaug[i,:])
+        #     y[i,0:self.npts] = np.real(r)
+        #     y[i,self.npts:] = np.imag(r)
 
-        return self.move_to_torch(x,y)
+        # return self.move_to_torch(x,y)
+        x = torch.cuda.FloatTensor(self.nbatch, self.npts+1).normal_()
+        x[:,0]=1.0
+        
+        y = torch.cuda.FloatTensor(self.nbatch, 2*self.npts).fill_(0)
+        xcpu = x.cpu().numpy()
+        for i in range(self.nbatch):
+            r = torch.as_tensor(np.roots(xcpu[i,:])).cuda()
+            
+            y[i, 0:self.npts] = torch.real(r)
+            y[i, self.npts:] = np.imag(r)
+            
+        return x, y
+        
 
 class x_double_x(Problem): # target the input squared
     def __init__(self, **kwargs):
@@ -810,12 +825,18 @@ class cumulative_sum_of_x(Problem): # moved to n_double_n
         npts = self.npts
         xsize = (nbatch,npts)
 
-        xrange = 20.0
-        x = np.random.uniform(low=-xrange, high=xrange, size=xsize)
-        bias = np.random.uniform(low=-xrange/10, high=xrange/10,size=(nbatch,1))
-        y = np.cumsum(x+bias,axis=1)
+        # xrange = 20.0
+        # x = np.random.uniform(low=-xrange, high=xrange, size=xsize)
+        # bias = np.random.uniform(low=-xrange/10, high=xrange/10,size=(nbatch,1))
+        # y = np.cumsum(x+bias,axis=1)
         
-        return self.move_to_torch(x,y)
+        # return self.move_to_torch(x,y)
+        xrange = 20.0
+        x = xrange*torch.rand(*xsize).cuda()
+        bias = torch.rand(*xsize).cuda()
+        y = torch.cumsum(x + bias, axis=1)
+        
+        return x,y
 
 
 
