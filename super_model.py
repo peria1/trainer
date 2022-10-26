@@ -47,6 +47,7 @@ class SuperModel(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__()
         self.register_forward_pre_hook(store_inputs)
+        self.training = False
         # self.register_forward_hook(store_outputs)
         
         self.max_iterations = 10000
@@ -70,8 +71,7 @@ class SuperModel(nn.Module):
         return len(tuple(self.parameters())) == 0
 
     def make_functional(self):
-        print('storing orig_params....')
-        assert(1==0)
+        print('!!!!!!!!!!!!!!!!!!!!!!!!!!storing orig_params....')
         orig_params = tuple(self.parameters())
         
         # print('PARAMETER REFERENCES ARE KEPT?')
@@ -470,7 +470,9 @@ def store_inputs(self, x):
     # Anyway, this is the forward_pre_hook that is registered at
     #   instantiation. 
     #
-    self.input_now = x[0] # get rid of unused extra arg included in hook call
+    if self.training is False: # in training, trainer.get_more_data() does this.
+        self.input_now = x[0] # get rid of unused extra arg included 
+                              #     in hook call
     
     if self.default_v is None:  # just a startup issue: need to know shape
         self.default_v = tuple([torch.ones_like(p.clone().detach()) \
