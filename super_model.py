@@ -222,6 +222,8 @@ class SuperModel(nn.Module):
                 
             loss = self.objective(pred, self.y_now)    
             
+            print('In loss_wrt_params, loss value is', loss.item())
+            
             self.zero_grad()
             
             loss.backward(retain_graph=True)
@@ -344,10 +346,10 @@ class SuperModel(nn.Module):
         scalar_mult(dpy, length/(npts-1))
         
         if symmetric:
-            for k,vhatk in zip(sdsave.keys(), vhatx):
-                sdadj[k] -= vhatk/2.0
-            for k,vhatk in zip(sdsave.keys(), vhaty):
-                sdadj[k] -= vhatk/2.0
+            for k,vhatk in zip(sdadj.keys(), vhatx):
+                sdadj[k] -= vhatk*length/2.0
+            for k,vhatk in zip(sdadj.keys(), vhaty):
+                sdadj[k] -= vhatk*length/2.0
         
         with torch.no_grad():
             lchk = torch.zeros(npts,npts)
@@ -390,7 +392,7 @@ class SuperModel(nn.Module):
         
         if symmetric:
             for k,vhatk in zip(sdsave.keys(), vhat):
-                sdadj[k] -= vhatk/2.0
+                sdadj[k] -= vhatk*length/2.0
         
         with torch.no_grad():
             lchk = torch.zeros(npts)
