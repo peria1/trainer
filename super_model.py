@@ -71,7 +71,7 @@ class SuperModel(nn.Module):
         return len(tuple(self.parameters())) == 0
 
     def make_functional(self):
-        print('!!!!!!!!!!!!!!!!!!!!!!!!!!storing orig_params....')
+        # print('!!!!!!!!!!!!!!!!!!!!!!!!!!storing orig_params....')
         orig_params = tuple(self.parameters())
         
         # print('PARAMETER REFERENCES ARE KEPT?')
@@ -225,7 +225,7 @@ class SuperModel(nn.Module):
                 
             loss = self.objective(pred, self.target_now)    
             
-            print('In loss_wrt_params, loss value is', loss.item())
+            # print('In loss_wrt_params, loss value is', loss.item())
             
             self.zero_grad()
             
