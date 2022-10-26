@@ -296,10 +296,11 @@ class trainer():
         try:
             x, y = x.to(self.device), y.to(self.device)
         except AttributeError:
+            print('Attribute error in get_more_data()')
             x, y = x.to(self.device), y
         # Can I put x and y into the model for use in Hessian stuff here? 
-        self.model.x_now = x
-        self.model.y_now = y
+        self.model.input_now = x
+        self.model.target_now = y
         return x, y
     
     def zap_history(self):
