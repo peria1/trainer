@@ -469,7 +469,7 @@ class roots_of_poly(Problem):
             r = torch.as_tensor(np.roots(xcpu[i,:])).cuda()
             
             y[i, 0:self.npts] = torch.real(r)
-            y[i, self.npts:] = np.imag(r)
+            y[i, self.npts:] = torch.imag(r)
             
         return x, y
         
