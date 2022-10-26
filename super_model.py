@@ -47,6 +47,7 @@ class SuperModel(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__()
         self.register_forward_pre_hook(store_inputs)
+        # self.register_forward_hook(store_outputs)
         
         self.max_iterations = 10000
         self.allowed_angular_error = 0.001 # radians
@@ -56,8 +57,8 @@ class SuperModel(nn.Module):
 
         self.default_v = None
         self.hessian = None
-        self.x_now = None
-        self.y_now = None
+        self.input_now = None
+        self.target_now = None
 
     def param_id_list(self):
         plist = []
@@ -69,6 +70,8 @@ class SuperModel(nn.Module):
         return len(tuple(self.parameters())) == 0
 
     def make_functional(self):
+        print('storing orig_params....')
+        assert(1==0)
         orig_params = tuple(self.parameters())
         
         # print('PARAMETER REFERENCES ARE KEPT?')
@@ -210,7 +213,7 @@ class SuperModel(nn.Module):
             if self.is_functional:
                 self.load_weights(self.names, new_params, as_params=False) # Weird! We removed the params before. 
             
-            pred = self.forward(self.x_now)
+            pred = self.forward(self.input_now)
             
             # if len(targs) == 0 and self.no_warning is False:
             #     self.no_warning = True
@@ -220,7 +223,7 @@ class SuperModel(nn.Module):
             #     print('targets for a given input. So be careful!')
             #     _ = input('Hit enter to continue...')
                 
-            loss = self.objective(pred, self.y_now)    
+            loss = self.objective(pred, self.target_now)    
             
             print('In loss_wrt_params, loss value is', loss.item())
             
@@ -356,7 +359,7 @@ class SuperModel(nn.Module):
             for i in range(npts):
                 for j in range(npts):
                     self.load_state_dict(sdadj)
-                    lchk[i,j]=self.objective(self(self.x_now), self.y_now)
+                    lchk[i,j]=self.objective(self(self.input_now), self.target_now)
                     
                     for k,dpi in zip(sdsave.keys(), dpx):
                         sdadj[k]+=dpi
@@ -398,7 +401,7 @@ class SuperModel(nn.Module):
             lchk = torch.zeros(npts)
             for i in range(npts):
                 self.load_state_dict(sdadj)
-                lchk[i]=self.objective(self(self.x_now), self.y_now)
+                lchk[i]=self.objective(self(self.input_now), self.target_now)
                 for k,dpi in zip(sdsave.keys(), dp):
                     sdadj[k]+=dpi
     
@@ -413,7 +416,7 @@ class SuperModel(nn.Module):
         return x, lchk
     
     def report(self):
-        if self.y_now is None:
+        if self.target_now is None:
             print('Need to define targets before calling report().')
             
         vmax, lmax = self.max_eigen_H()
@@ -436,7 +439,7 @@ class SuperModel(nn.Module):
         
     def scales(self): # get L/dLdx gradient and dLdx/d2L/dx2 along max 
                         # and min eig directions
-        L0 = self.objective(self(self.x_now), self.y_now)
+        L0 = self.objective(self(self.input_now), self.target_now)
         dL = dict_to_tuple(self.capture_gradients())
         
         (vmin, lmin), (vmax, lmax) = self.eig_extremes()
@@ -458,10 +461,6 @@ class SuperModel(nn.Module):
             scale_dict.update({k: scale_vals[i]})
             
         return scale_dict
-        
-    
-        
-        
 
 def store_inputs(self, x): 
     # How is self defined here? This does work! I just don't get why. The
@@ -470,11 +469,22 @@ def store_inputs(self, x):
     #
     # Anyway, this is the forward_pre_hook that is registered at
     #   instantiation. 
-    self.x_now = x[0] # get rid of unused extra arg included in hook call
+    #
+    self.input_now = x[0] # get rid of unused extra arg included in hook call
     
     if self.default_v is None:  # just a startup issue: need to know shape
         self.default_v = tuple([torch.ones_like(p.clone().detach()) \
                                       for p in self.parameters()])
+
+def store_outputs(self, x, pred): # whoops! I want to store targets, not predictions
+    # print('storing')
+    # lx = len(x)
+    # for i in range(lx):
+    #     print(type(x[i]), x[i].shape)
+    # print(type(pred), pred.shape)
+    # self.target_now = pred
+    pass
+
 
 def del_attr(obj, names_split): # why, why, why? But it definitely breaks without this. 
     if len(names_split) == 1:
@@ -601,10 +611,10 @@ if __name__ == "__main__":
     hmlp.objective = lambda x,y : torch.sum((x-y)**2)
     
     out = mlp(xglobal)  
-    mlp.y_now = torch.randn_like(out)
+    mlp.target_now = torch.randn_like(out)  
     
     outh = hmlp(xglobal)
-    hmlp.y_now = mlp.y_now
+    hmlp.target_now = mlp.target_now
     # print('grads before eigs', mlp.capture_gradients())
 
 
@@ -670,7 +680,7 @@ if __name__ == "__main__":
     # fpp = torch.sqrt(dot_vect(vuH, vuH))    
     # # this is the step size, in the vunit direction, that should bring 
     # #   the gradient magnitude to zero, if the gradient varies linearly. 
-    # # It's delta_x = y_now/slope...a step that big should bring y to zero. 
+    # # It's delta_x = target_now/slope...a step that big should bring y to zero. 
     # scale = gradmag/fpp  
     # print('Expect zero gradient after step of',scale.item())
     
