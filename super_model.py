@@ -48,12 +48,10 @@ class SuperModel(nn.Module):
         super().__init__()
         self.register_forward_pre_hook(store_inputs)
         self.training = False
-        # self.register_forward_hook(store_outputs)
         
-        self.max_iterations = 10000
+        self.max_iterations = 10000 # for eig finding via power method
         self.allowed_angular_error = 0.001 # radians
         self.allowed_cos_error = 1-np.cos(self.allowed_angular_error)
-        print(self.allowed_cos_error)
         self.no_warning = False
 
         self.default_v = None
@@ -71,17 +69,8 @@ class SuperModel(nn.Module):
         return len(tuple(self.parameters())) == 0
 
     def make_functional(self):
-        # print('!!!!!!!!!!!!!!!!!!!!!!!!!!storing orig_params....')
         orig_params = tuple(self.parameters())
         
-        # print('PARAMETER REFERENCES ARE KEPT?')
-        # This pumps out True a bajillion times...
-        # for op, sp in zip(orig_params, self.parameters()):
-        #     print(op==sp)
-        #
-        # So, orig_params is a tuple of references to the original model params
-            
-        # orig_grad = self.capture_gradients()
         # Remove all the parameters from the model, because reasons. 
         names = []
         for name, p in list(self.named_parameters()):
@@ -90,7 +79,6 @@ class SuperModel(nn.Module):
             
         self.names = names
         self.orig_params = orig_params
-        # self.curr_grad = orig_grad
         
     def load_weights(self, names, params, as_params=False):
         for name, p in zip(names, params):
@@ -98,33 +86,14 @@ class SuperModel(nn.Module):
                 set_attr(self, name.split("."), p)
             else:
                 set_attr(self, name.split("."), torch.nn.Parameter(p))
+               
     
-    # def restore_model(self, orig=False): # (this one is mine)
-    #     if not self.is_functional():
-    #         return  # no need to restore....
-        
-    #     self.load_weights(self.names, self.orig_params, as_params=True)
-        
-    #     if orig:
-    #         grad = self.orig_grad
-    #     else:
-    #         grad = self.curr_grad
-            
-    #     for k, v in self.named_parameters():
-    #         kg = k + '.grad'
-    #         if grad[kg] is not None:
-    #             v.grad = grad[kg].clone().detach()
-    #         else:
-    #             v.grad = None
-                
-    
-    #  # returns gradients in dict vector form (this one is also mine)
+    #  # returns gradients in dict vector form (this one is mine)
     def capture_gradients(self):
         if self.is_functional():
             self.load_weights(self.names, \
                               self.orig_params, \
                                   as_params=False) 
-            # self.restore_model()
         g = {}
         for k, v in self.named_parameters():
             gnext = v.grad
@@ -174,11 +143,9 @@ class SuperModel(nn.Module):
                 pf = torch.cat((pf, torch.flatten(p)))
         return pf        
         
-# vfmin = torch.cat((torch.flatten(vmin[0]),torch.flatten(vmin[1])))
-
-    def flatten_H(self, Ht):
+    def flatten_H(self, Ht): # when H is small enough, this puts it in matrix
         N = self.count_params()
-        H = torch.zeros(N, N)
+        H = torch.zeros(N, N)  # BOOM for a real model. 
         ps = [p.shape for p in self.parameters()]
 
         top,left = 0,0
@@ -194,11 +161,8 @@ class SuperModel(nn.Module):
                 
             top += height
         
-        
-        
         return H
-        
-       
+         
     def vH(self, v=None, get_hessian=False):  # easy interface to vector-Hessian product. 
         # You can multiply any vector v into the Hessian, but....
         if v is None:
@@ -356,27 +320,24 @@ class SuperModel(nn.Module):
         
         with torch.no_grad():
             lchk = torch.zeros(npts,npts)
-            dist = torch.zeros(npts,npts).cuda()
+            # dist = torch.zeros(npts,npts).cuda()
+            dx = torch.zeros(npts,npts).cuda()
+            dy = torch.zeros(npts,npts).cuda()
+            
             for irow in range(npts):
                 for jcol in range(npts):
                     self.load_state_dict(sdadj)
                     lchk[irow,jcol]=self.objective(self(self.input_now), 
                                                    self.target_now)
 
-                    for k in sdadj.keys():
-                        p1 = sdadj[k]
-                        p0 = sdsave[k]
-                        dist[irow,jcol] += torch.sum((p1-p0)**2)
-                    
-                    for k,dpxi in zip(sdadj.keys(), dpx):
-                        sdadj[k]+=dpxi
-                       
-                for isd,k in enumerate(sdadj.keys()): # one pass over vector
-                    sdadj[k]+=dpy[isd]
-                    sdadj[k]-=(npts-1)*dpx[isd]
-    
-            torch.sqrt_(dist)
-            self.dist = dist
+                    sdadj = add_vect(sdadj, dpx)
+                
+                sdadj = add_vect(sdadj, dpy)
+                sdadj = linear_combo(sdadj, dpx, 
+                                     1.0, -torch.tensor(npts).float())
+
+            
+            
     
     
             if symmetric:
@@ -493,15 +454,6 @@ def store_inputs(self, x):
     if self.default_v is None:  # just a startup issue: need to know shape
         self.default_v = tuple([torch.ones_like(p.clone().detach()) \
                                       for p in self.parameters()])
-
-def store_outputs(self, x, pred): # whoops! I want to store targets, not predictions
-    # print('storing')
-    # lx = len(x)
-    # for i in range(lx):
-    #     print(type(x[i]), x[i].shape)
-    # print(type(pred), pred.shape)
-    # self.target_now = pred
-    pass
 
 
 def del_attr(obj, names_split): # why, why, why? But it definitely breaks without this. 
