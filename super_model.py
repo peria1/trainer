@@ -349,24 +349,35 @@ class SuperModel(nn.Module):
         scalar_mult(dpy, length/(npts-1))
         
         if symmetric:
-            for k,vhatk in zip(sdadj.keys(), vhatx):
-                sdadj[k] -= vhatk*length/2.0
-            for k,vhatk in zip(sdadj.keys(), vhaty):
-                sdadj[k] -= vhatk*length/2.0
+            for k,vhatxk in zip(sdadj.keys(), vhatx):
+                sdadj[k] -= vhatxk*length/2.0
+            for k,vhatyk in zip(sdadj.keys(), vhaty):
+                sdadj[k] -= vhatyk*length/2.0
         
         with torch.no_grad():
             lchk = torch.zeros(npts,npts)
-            for i in range(npts):
-                for j in range(npts):
+            dist = torch.zeros(npts,npts).cuda()
+            for irow in range(npts):
+                for jcol in range(npts):
                     self.load_state_dict(sdadj)
-                    lchk[i,j]=self.objective(self(self.input_now), self.target_now)
+                    lchk[irow,jcol]=self.objective(self(self.input_now), 
+                                                   self.target_now)
+
+                    for k in sdadj.keys():
+                        p1 = sdadj[k]
+                        p0 = sdsave[k]
+                        dist[irow,jcol] += torch.sum((p1-p0)**2)
                     
-                    for k,dpi in zip(sdsave.keys(), dpx):
-                        sdadj[k]+=dpi
-                for i,k in enumerate(sdsave.keys()):
-                    sdadj[k]+=dpy[i]
-                    sdadj[k]-=(npts-1)*dpx[i]
-                
+                    for k,dpxi in zip(sdadj.keys(), dpx):
+                        sdadj[k]+=dpxi
+                       
+                for isd,k in enumerate(sdadj.keys()): # one pass over vector
+                    sdadj[k]+=dpy[isd]
+                    sdadj[k]-=(npts-1)*dpx[isd]
+    
+            torch.sqrt_(dist)
+            self.dist = dist
+    
     
             if symmetric:
                 x = torch.linspace(-length/2.0, length/2.0, npts)
@@ -394,17 +405,24 @@ class SuperModel(nn.Module):
         scalar_mult(dp, length/(npts-1))
         
         if symmetric:
-            for k,vhatk in zip(sdsave.keys(), vhat):
+            for k,vhatk in zip(sdadj.keys(), vhat):
                 sdadj[k] -= vhatk*length/2.0
         
         with torch.no_grad():
             lchk = torch.zeros(npts)
+            dist = torch.zeros(npts).cuda()
             for i in range(npts):
                 self.load_state_dict(sdadj)
-                lchk[i]=self.objective(self(self.input_now), self.target_now)
+                lchk[i] = self.objective(self(self.input_now), self.target_now)
+                
                 for k,dpi in zip(sdsave.keys(), dp):
                     sdadj[k]+=dpi
-    
+                    p0 = sdsave[k]
+                    p1 = sdadj[k]
+                    dist[i] += torch.sum((p1-p0)**2)
+            torch.sqrt_(dist)
+            self.line_dist = dist
+
             if symmetric:
                 x = torch.linspace(-length/2.0, length/2.0, npts)
             else:
@@ -418,36 +436,34 @@ class SuperModel(nn.Module):
     def report(self):
         if self.target_now is None:
             print('Need to define targets before calling report().')
+            return
             
         vmax, lmax = self.max_eigen_H()
         vmin, lmin = self.min_eigen_H(lmax)
         g = dict_to_tuple(self.capture_gradients())
         
-        rad2deg = 180/np.pi
-        g2max = angle_vect(g, vmax)*rad2deg
-        g2min = angle_vect(g, vmin)*rad2deg
-        max2min = angle_vect(vmax, vmin)*rad2deg
+        g2max = angle_vect(g, vmax, degrees=True)
+        g2min = angle_vect(g, vmin, degrees=True)
+        max2min = angle_vect(vmax, vmin, degrees=True)
         
         print('\n\n===========================================\n')
-        print('Max eigenvalue:',lmax)
-        print('Min eigenvalue:',lmin)
+        print('Max eigenvalue:',lmax.item())
+        print('Min eigenvalue:',lmin.item())
         
-        print('grad to vmax',g2max)
-        print('grad to vmin',g2min)
-        print('vmin to vmax',max2min)
+        print('grad to vmax',g2max.item(),'degrees')
+        print('grad to vmin',g2min.item(),'degrees')
+        print('vmin to vmax',max2min.item(),'degrees')
         print('============================================\n\n')
         
     def scales(self): # get L/dLdx gradient and dLdx/d2L/dx2 along max 
                         # and min eig directions
         L0 = self.objective(self(self.input_now), self.target_now)
-        dL = dict_to_tuple(self.capture_gradients())
+        dL = self.capture_gradients()
         
         (vmin, lmin), (vmax, lmax) = self.eig_extremes()
         scalar_mult(vmin, torch.sqrt(dot_vect(vmin, vmin)))
         scalar_mult(vmax, torch.sqrt(dot_vect(vmax, vmax)))
         
-        # d2min = self.vH(v=vmin) # don't need these, use eigenvalues
-        # d2max = self.vH(v=vmax)
         
         L_to_zero = L0/torch.sqrt(dot_vect(dL, dL))
         dL_to_zero_mineig = dot_vect(dL, vmin)/lmin # these are 
@@ -463,12 +479,12 @@ class SuperModel(nn.Module):
         return scale_dict
 
 def store_inputs(self, x): 
-    # How is self defined here? This does work! I just don't get why. The
-    #   idea is to have the model input available to all SuperModel methods,
-    #   which the toy examples do via a global reference. 
     #
-    # Anyway, this is the forward_pre_hook that is registered at
-    #   instantiation. 
+    # This is the forward_pre_hook that is registered in SuperModel at
+    #   instantiation. Although other things *could* also register it, and
+    #   then self would be an instance of one of those things. 
+    #
+    # I think that's ok because this function only impacts self. 
     #
     if self.training is False: # in training, trainer.get_more_data() does this.
         self.input_now = x[0] # get rid of unused extra arg included 
@@ -524,7 +540,7 @@ def max_vect_comp(x, maxabs=False):
 
 def scalar_mult(x,a):  # IN-PLACE!! Returns None...
     try:
-        for xi in x:
+        for xi in dict_to_tuple(x):
             xi *= a
     except TypeError:
         x *= a
@@ -533,9 +549,10 @@ def norm_vect(x):  # IN-PLACE!! Returns None...
     scalar_mult(x, 1./torch.sqrt(dot_vect(x,x)))
 
 def dot_vect(a,b):
+    dt = dict_to_tuple
     adotb = 0.0
     try:
-        for ai,bi in zip(a,b):
+        for ai,bi in zip(dt(a),dt(b)):
             assert(ai.shape == bi.shape)
             adotb += torch.sum(ai*bi)            
     except TypeError:
@@ -547,34 +564,108 @@ def dot_vect(a,b):
     return adotb
    
 def add_vect(a,b):
-    c = list(copy.deepcopy(a))
+    return linear_combo(a, b, 1.0, 1.0)
+        
+def subtract_vect(a,b):
+    return linear_combo(a, b, 1.0, -1.0)
+
+def linear_combo(a,b,*scales):
+    sdefs = [1.0,1.0]
+    for i,(s,sc) in enumerate(zip(sdefs,scales)):
+        sdefs[i] = sc
+    sa,sb = sdefs    
+        
+    dt = dict_to_tuple  # will try to convert dicts when iterating over vectors
+
+#   If you have two dicts, you need to make sure their keys make sense 
+#   together. Returned value will have keys from vector 'a' if they exist,
+#   or else 'b' if those exist, or else be a tuple. 
+#
+#   The returned vector will have as many component blocks as the input vector
+#   with the fewest blocks. 
+#
+    return_dict = isinstance(a, dict) or isinstance(b, dict) # keep any keys 
+    
+    combo = list(copy.deepcopy(a))
     try:
-        for i,(ai,bi) in enumerate(zip(a,b)):
+        for i,(ai,bi) in enumerate(zip(dt(a),dt(b))):
             assert(ai.shape == bi.shape)
-            c[i] = ai + bi           
+            combo[i] = sa*ai + sb*bi           
     except TypeError:
         assert(a.shape==b.shape)
-        c = a + b
+        combo = sa*a + sb*b
+    except AssertionError:
+        print('OOPS! Shape mismatch in linear_combo.', a.shape, b.shape)
+        combo = None
+    
+    if return_dict:
+        try:
+            keys = a.keys()
+        except AttributeError:
+            keys = b.keys()
+        combo = {k:v for k,v in zip(keys,combo)}
+    else:
+        combo = tuple(combo)
+        
+    return combo
+
+def dict_to_tuple(d):
+    try:
+        return tuple(v for v in d.values())
+    except AttributeError:
+        return d
+
+def angle_vect(a,b, degrees=False):
+    angle = torch.acos(cos_angle_vect(a, b))
+    if degrees:
+        angle = torch.rad2deg(angle)
+    return angle
+
+def cos_angle_vect(a,b): # repeated code, just like project_vect
+    dt = dict_to_tuple
+    adotb = 0.0
+    anormsq, bnormsq = 0.0, 0.0
+    try:
+        for ai,bi in zip(dt(a),dt(b)):
+            assert(ai.shape == bi.shape)
+            adotb += torch.sum(ai*bi) 
+            anormsq += torch.sum(ai*ai)
+            bnormsq += torch.sum(bi*bi)
+    except TypeError:
+        assert(a.shape==b.shape)
+        adotb += torch.sum(a*b)
+        anormsq += torch.sum(a*a)
+        bnormsq += torch.sum(b*b)
     except AssertionError:
         print('OOPS!', a.shape, b.shape)
-        c = None
-    return tuple(c)
-
-def angle_vect(a,b):
-    cos_ab = dot_vect(a,b)/torch.sqrt(dot_vect(a,a)*dot_vect(b,b))
+        adotb = None
     
-    return torch.acos(cos_ab)
-
-def cos_angle_vect(a,b):
-    cos_ab = dot_vect(a,b)/torch.sqrt(dot_vect(a,a)*dot_vect(b,b))
-    
+    cos_ab = adotb/torch.sqrt(anormsq*bnormsq)
     return cos_ab
-    
-def dict_to_tuple(d):
-    t = []
-    for k,v in d.items():
-        t.append(v)
-    return tuple(t)
+
+def project_vect(a,b): # I need to repeat some code here to avoid extra passes 
+                        #   over vectors, i.e. I'm not using dot_product().
+    c = copy.deepcopy(b)
+
+    dt = dict_to_tuple
+    adotb = 0.0
+    bnormsq = 0.0
+    try:
+        for ai,bi in zip(dt(a),dt(b)):
+            assert(ai.shape == bi.shape)
+            adotb += torch.sum(ai*bi)
+            bnormsq += torch.sum(bi*bi)
+            
+    except TypeError:
+        assert(a.shape==b.shape)
+        adotb += torch.sum(a*b)
+        bnormsq += torch.sum(b*b)
+    except AssertionError:
+        print('OOPS!', a.shape, b.shape)
+        adotb = None
+
+    scalar_mult(c, adotb/bnormsq)
+    return c
 
 if __name__ == "__main__":
     
