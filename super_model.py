@@ -162,7 +162,58 @@ class SuperModel(nn.Module):
             top += height
         
         return H
-         
+ 
+    def gradf(self):  # easy interface to functional grad. 
+        # You can multiply any vector v into the Hessian, but....
+        # if v is None:
+        #     v = self.default_v  # just 1's, shaped like params.
+
+        # self.orig_grad = self.capture_gradients()
+        # This is the loss function that allows Hessian computations
+        #   with respect to parameters rather than input. It wraps
+        #   whatever loss function we are training (self.objective), via
+        #   this SuperModel class. 
+        def loss_wrt_params(*new_params):
+            if self.is_functional:
+                self.load_weights(self.names, new_params, as_params=False) # Weird! We removed the params before. 
+            
+            pred = self.forward(self.input_now)
+            loss = self.objective(pred, self.target_now)    
+            
+            # print('In gradf loss_wrt_params, loss value is', loss.item())
+            
+            self.zero_grad()
+            
+            # loss.backward(retain_graph=True) # avoiding this.
+            return loss
+    
+        if not self.is_functional():
+            self.make_functional() # monkey-patching, step 1...
+            
+        params2pass = tuple(p.detach().requires_grad_() for p in self.orig_params)
+    
+        outputs = loss_wrt_params(*self.orig_params) # Unpatched inside function...
+        #
+        # _ = self.capture_gradients()
+
+        self.make_functional() # monkey-patching now complete. Wow.
+
+        grad = torch.autograd.grad(outputs, params2pass)
+            
+        # if get_hessian:
+        #     self.hessian = \
+        #     torch.autograd.functional.hessian(loss_wrt_params,
+        #                                       params2pass, 
+        #                                       strict=True)
+        #     # self.hessian = self.flatten_H(Ht)
+            
+        self.load_weights(self.names, \
+                          self.orig_params, \
+                              as_params=False) 
+        # self.restore_model(orig=True) # did I botch this with grad stuff??
+        
+        return grad
+        
     def vH(self, v=None, get_hessian=False):  # easy interface to vector-Hessian product. 
         # You can multiply any vector v into the Hessian, but....
         if v is None:
