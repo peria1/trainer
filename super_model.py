@@ -105,6 +105,11 @@ class SuperModel(nn.Module):
             g.update(next_entry)
         return g
     
+    def recompute_gradients(self):
+        self.zero_grad()
+        self.objective(self.forward(self.input_now), self.target_now).backward()
+        return
+    
     def count_params(self):
         count = 0
         prod, T = torch.prod, torch.tensor
@@ -358,6 +363,9 @@ class SuperModel(nn.Module):
         vhat0y = copy.deepcopy(vhaty)
         norm_vect(vhatx)
         norm_vect(vhaty)
+        vhatx = dict_to_tuple(vhatx)
+        vhaty = dict_to_tuple(vhaty)
+
         dpx = copy.deepcopy(vhatx)
         dpy = copy.deepcopy(vhaty)
         scalar_mult(dpx, length/(npts-1))
@@ -372,8 +380,8 @@ class SuperModel(nn.Module):
         with torch.no_grad():
             lchk = torch.zeros(npts,npts)
             # dist = torch.zeros(npts,npts).cuda()
-            dx = torch.zeros(npts,npts).cuda()
-            dy = torch.zeros(npts,npts).cuda()
+            # dx = torch.zeros(npts,npts).cuda()
+            # dy = torch.zeros(npts,npts).cuda()
             
             for irow in range(npts):
                 for jcol in range(npts):
@@ -413,6 +421,7 @@ class SuperModel(nn.Module):
         sdsave = copy.deepcopy(sdadj)   # sdsave is safe from load_state_dict()
         vhat0 = copy.deepcopy(vhat)
         norm_vect(vhat)
+        vhat = dict_to_tuple(vhat)
         dp = copy.deepcopy(vhat)
         scalar_mult(dp, length/(npts-1))
         
@@ -458,6 +467,10 @@ class SuperModel(nn.Module):
         g2min = angle_vect(g, vmin, degrees=True)
         max2min = angle_vect(vmax, vmin, degrees=True)
         
+        gproj = add_vect(project_vect(g, vmin),
+                         project_vect(g, vmax))
+        tht_out = angle_vect(gproj, g, degrees=True)
+        
         print('\n\n===========================================\n')
         print('Max eigenvalue:',lmax.item())
         print('Min eigenvalue:',lmin.item())
@@ -465,6 +478,7 @@ class SuperModel(nn.Module):
         print('grad to vmax',g2max.item(),'degrees')
         print('grad to vmin',g2min.item(),'degrees')
         print('vmin to vmax',max2min.item(),'degrees')
+        print('grad out of plane', tht_out.item(), 'degrees')
         print('============================================\n\n')
         
     def scales(self): # get L/dLdx gradient and dLdx/d2L/dx2 along max 
@@ -527,6 +541,80 @@ def sigprime(x):
 
 def invsigmoid(x):
     return -torch.log(1/x-1)
+    
+"""
+
+MATLAB code for sampling randomly throughout or on surface of N-sphere. 
+
+function xball = n_ball_sample(d,dims,p)
+
+if nargin < 2
+    dims = [1,1000];
+end
+
+if nargin < 3
+    p = 2;
+end
+
+sizex = [d, dims(:).'];
+
+signx = sign(unifrnd(-1,1,sizex));
+%
+% Minus lambda times the log of a uniform variate (0 to 1) is distributed
+% exponentially with a mean of lambda. Use this to generate the deviates
+% needed for step 1 in Tadikamalla, Pandu R. “Random Sampling from the
+% Exponential Power Distribution.” Journal of the American Statistical
+% Association, vol. 75, no. 371, 1980, pp. 683–686. JSTOR,
+% www.jstor.org/stable/2287669.
+%
+A = 1/p; B = A.^A;
+
+u = unifrnd(0,1,sizex);
+gt0p5 = u > 0.5;
+xp = zeros(sizex);
+xp(gt0p5) = -B.*(log(2.*(1-u(gt0p5))));
+xp(~gt0p5) = B.*(log(2*u(~gt0p5)));
+
+% x = absx .* signx;
+x = xp;
+
+done = false;
+mlnr = exprnd(1,sizex);
+RHS = x.^p - x./B + 1 - A;
+reject = 1:numel(mlnr);
+while ~done
+    reject = mlnr(reject) <  RHS(reject);
+    nreject = sum(reject);
+    if nreject > 0
+        mlnr(reject) = exprnd(1,1,nreject);
+    else
+        done = true;
+    end
+%     fprintf(['n rejected is ',num2str(numel(reject)),'\n'])
+end
+
+signxpow = sign(unifrnd(-1,1,sizex));
+xpow = signxpow.*exp(-mlnr);
+Y = exprnd(1.0,[1 sizex(2:end)]);
+
+denom = (sum(abs(xpow).^p) + Y).^(1/p);
+
+xball = xpow./denom;
+
+return
+end
+"""
+# def random_vect_like(x, surface=True):
+#     # use n_ball_sample to get random unit vector? 
+#   THis is not the easiest translation to make. Need tp sort through 
+#   and see which things need my special tuple-vector fcuntions and which 
+#   don't
+    
+#     denom = (torch.sum())
+#     xball = xpow/denom
+#     if surface:
+#         norm_vect(xball)
+#     return xball
     
 def max_vect_comp(x, maxabs=False):
     fmax = lambda x : torch.max(torch.abs(x)) if maxabs else torch.max(x)
@@ -619,7 +707,7 @@ def dict_to_tuple(d):
         return d
 
 def angle_vect(a,b, degrees=False):
-    angle = torch.acos(cos_angle_vect(a, b))
+    angle = torch.acos(torch.clip(cos_angle_vect(a, b),-1,1))
     if degrees:
         angle = torch.rad2deg(angle)
     return angle
@@ -648,7 +736,7 @@ def cos_angle_vect(a,b): # repeated code, just like project_vect
 
 def project_vect(a,b): # I need to repeat some code here to avoid extra passes 
                         #   over vectors, i.e. I'm not using dot_product().
-    c = copy.deepcopy(b)
+    c = copy.deepcopy(a)
 
     dt = dict_to_tuple
     adotb = 0.0
