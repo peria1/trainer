@@ -105,10 +105,41 @@ class SuperModel(nn.Module):
             g.update(next_entry)
         return g
     
-    def recompute_gradients(self):
-        self.zero_grad()
+    def recompute_gradients(self, accum=False):
+        if not accum:
+            self.zero_grad()
         self.objective(self.forward(self.input_now), self.target_now).backward()
         return
+    
+    def grad_angle_noise(self):
+        done = False
+        nprev = torch.tensor(0.0).cuda()
+        g = self.capture_gradients()
+        
+        sg = copy.deepcopy(g)
+        sgg = component_mult(g, g)
+        N=1
+
+        while True:
+            self.load_new_data()
+            self.recompute_gradients()
+            g = self.capture_gradients()
+            
+            sg = add_vect(sg, g)
+            sgg = add_vect(sgg, component_mult(g, g))
+            N+=1
+            
+            ncurr2 = linear_combo(sgg, component_mult(sg,sg), 1/N, -1/N**2)
+            ncurr = torch.sqrt(component_sum(ncurr2)) 
+            
+            frac_change = (nprev-ncurr)/nprev
+            done =  torch.abs(frac_change) < 1e-9
+            print(frac_change)
+            if done:
+                break
+            nprev = ncurr
+            
+        return ncurr
     
     def count_params(self):
         count = 0
@@ -116,6 +147,14 @@ class SuperModel(nn.Module):
         for p in self.parameters():
             count += prod(T(p.shape))
         return count.item()
+    
+    def load_new_data(self):
+        try:
+            self.input_now, self.target_now = \
+                self.trainer.get_more_data()
+        except AttributeError:
+             print('No trainer defined, cannot load data.')
+        
     
     def set_criterion(self, objective):
         assert callable(objective)
@@ -343,6 +382,27 @@ class SuperModel(nn.Module):
                   
         scalar_mult(vnext, 1./max_vect_comp(vnext, maxabs=True))
         return vnext, lambda_min
+
+    def true_grad(self):
+        gtot_prev = self.capture_gradients()
+        count = 0
+        while True:
+            self.load_new_data()
+            self.recompute_gradients(accum=True)
+            gtot_next = self.capture_gradients()
+            dtht = angle_vect(gtot_prev,gtot_next)
+            if count % 50 == 0:
+                print(str(count)+': dtht:',dtht)
+            
+            converged = torch.abs(dtht) < 0.01
+            
+            if converged:
+                break
+            gtot_prev = gtot_next
+            count+=1
+            
+        print('Took',count,'iterations')
+        return gtot_prev
 
     def eig_extremes(self):
         vmax, lmax = self.max_eigen_H()
@@ -639,7 +699,10 @@ def scalar_mult(x,a):  # IN-PLACE!! Returns None...
 def norm_vect(x):  # IN-PLACE!! Returns None...
     scalar_mult(x, 1./torch.sqrt(dot_vect(x,x)))
 
-def dot_vect(a,b):
+def dot_vect(a,b=None):
+    if b is None:
+        return dot_vect(a,a)
+    
     dt = dict_to_tuple
     adotb = 0.0
     try:
@@ -654,6 +717,36 @@ def dot_vect(a,b):
         adotb = None
     return adotb
    
+def component_mult(a,b): # returns vector of all component products
+    dt = dict_to_tuple
+    prod = list(copy.deepcopy(dt(a)))
+    try:
+        for i,(ai,bi) in enumerate(zip(dt(a),dt(b))):
+            assert(ai.shape == bi.shape)
+            prod[i] = ai*bi           
+    except TypeError:
+        assert(a.shape==b.shape)
+        prod = a*b
+    except AssertionError:
+        print('OOPS! Shape mismatch in linear_combo.', a.shape, b.shape)
+        prod = None
+    
+    prod = tuple(prod)
+        
+    return prod
+
+def component_sum(a): # returns scalar sum of all components
+    dt = dict_to_tuple
+    sum_a = 0.0
+    try:
+        for ai in dt(a):
+            sum_a += torch.sum(ai)
+    except TypeError:
+        sum_a = torch.sum(a)
+            
+    return sum_a
+     
+
 def add_vect(a,b):
     return linear_combo(a, b, 1.0, 1.0)
         
@@ -661,13 +754,6 @@ def subtract_vect(a,b):
     return linear_combo(a, b, 1.0, -1.0)
 
 def linear_combo(a,b,*scales):
-    sdefs = [1.0,1.0]
-    for i,(s,sc) in enumerate(zip(sdefs,scales)):
-        sdefs[i] = sc
-    sa,sb = sdefs    
-        
-    dt = dict_to_tuple  # will try to convert dicts when iterating over vectors
-
 #   If you have two dicts, you need to make sure their keys make sense 
 #   together. Returned value will have keys from vector 'a' if they exist,
 #   or else 'b' if those exist, or else be a tuple. 
@@ -675,6 +761,13 @@ def linear_combo(a,b,*scales):
 #   The returned vector will have as many component blocks as the input vector
 #   with the fewest blocks. 
 #
+    sdefs = [1.0,1.0]
+    for i,(s,sc) in enumerate(zip(sdefs,scales)):
+        sdefs[i] = sc
+    sa,sb = sdefs    
+        
+    dt = dict_to_tuple  # will try to convert dicts when iterating over vectors
+
     return_dict = isinstance(a, dict) or isinstance(b, dict) # keep any keys 
     
     combo = list(copy.deepcopy(a))
@@ -703,7 +796,7 @@ def linear_combo(a,b,*scales):
 def dict_to_tuple(d):
     try:
         return tuple(v for v in d.values())
-    except AttributeError:
+    except (AttributeError, NotImplementedError):
         return d
 
 def angle_vect(a,b, degrees=False):
@@ -736,7 +829,7 @@ def cos_angle_vect(a,b): # repeated code, just like project_vect
 
 def project_vect(a,b): # I need to repeat some code here to avoid extra passes 
                         #   over vectors, i.e. I'm not using dot_product().
-    c = copy.deepcopy(a)
+    c = copy.deepcopy(b) # projecting onto b
 
     dt = dict_to_tuple
     adotb = 0.0
@@ -757,6 +850,24 @@ def project_vect(a,b): # I need to repeat some code here to avoid extra passes
 
     scalar_mult(c, adotb/bnormsq)
     return c
+
+def random_vect_like(a):
+    is_dict = isinstance(a, dict)
+    b = copy.deepcopy(a)
+    try:
+        for i,bork in enumerate(b):
+            if is_dict:
+                b[bork] = torch.randn_like(b[bork])
+            else:
+                b[i] = torch.randn_like(bork)
+                
+    except TypeError:
+         b = torch.randn_like(a)
+           
+    scalar_mult(b, 1.0/torch.sqrt(dot_vect(b,b)))
+    
+    return b
+ 
 
 if __name__ == "__main__":
     
