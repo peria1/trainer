@@ -404,6 +404,26 @@ class SuperModel(nn.Module):
         print('Took',count,'iterations')
         return gtot_prev
 
+    def rand_walk(self):
+        g0 = self.capture_gradients()
+        walk_prev = random_vect_like(g0)
+        count = 0
+        while True:
+            walk_next = add_vect(walk_prev, random_vect_like(g0))
+            dtht = angle_vect(walk_prev,walk_next)
+            if count % 1000 == 0:
+                print(str(count)+': dtht:',dtht)
+            
+            converged = torch.abs(dtht) < 0.01
+            
+            if converged:
+                break
+            walk_prev = walk_next
+            count+=1
+            
+        print('Took',count,'iterations')
+        return walk_prev
+
     def eig_extremes(self):
         vmax, lmax = self.max_eigen_H()
         vmin, lmin = self.min_eigen_H(lmax)
@@ -602,80 +622,6 @@ def sigprime(x):
 def invsigmoid(x):
     return -torch.log(1/x-1)
     
-"""
-
-MATLAB code for sampling randomly throughout or on surface of N-sphere. 
-
-function xball = n_ball_sample(d,dims,p)
-
-if nargin < 2
-    dims = [1,1000];
-end
-
-if nargin < 3
-    p = 2;
-end
-
-sizex = [d, dims(:).'];
-
-signx = sign(unifrnd(-1,1,sizex));
-%
-% Minus lambda times the log of a uniform variate (0 to 1) is distributed
-% exponentially with a mean of lambda. Use this to generate the deviates
-% needed for step 1 in Tadikamalla, Pandu R. “Random Sampling from the
-% Exponential Power Distribution.” Journal of the American Statistical
-% Association, vol. 75, no. 371, 1980, pp. 683–686. JSTOR,
-% www.jstor.org/stable/2287669.
-%
-A = 1/p; B = A.^A;
-
-u = unifrnd(0,1,sizex);
-gt0p5 = u > 0.5;
-xp = zeros(sizex);
-xp(gt0p5) = -B.*(log(2.*(1-u(gt0p5))));
-xp(~gt0p5) = B.*(log(2*u(~gt0p5)));
-
-% x = absx .* signx;
-x = xp;
-
-done = false;
-mlnr = exprnd(1,sizex);
-RHS = x.^p - x./B + 1 - A;
-reject = 1:numel(mlnr);
-while ~done
-    reject = mlnr(reject) <  RHS(reject);
-    nreject = sum(reject);
-    if nreject > 0
-        mlnr(reject) = exprnd(1,1,nreject);
-    else
-        done = true;
-    end
-%     fprintf(['n rejected is ',num2str(numel(reject)),'\n'])
-end
-
-signxpow = sign(unifrnd(-1,1,sizex));
-xpow = signxpow.*exp(-mlnr);
-Y = exprnd(1.0,[1 sizex(2:end)]);
-
-denom = (sum(abs(xpow).^p) + Y).^(1/p);
-
-xball = xpow./denom;
-
-return
-end
-"""
-# def random_vect_like(x, surface=True):
-#     # use n_ball_sample to get random unit vector? 
-#   THis is not the easiest translation to make. Need tp sort through 
-#   and see which things need my special tuple-vector fcuntions and which 
-#   don't
-    
-#     denom = (torch.sum())
-#     xball = xpow/denom
-#     if surface:
-#         norm_vect(xball)
-#     return xball
-    
 def max_vect_comp(x, maxabs=False):
     fmax = lambda x : torch.max(torch.abs(x)) if maxabs else torch.max(x)
     maxv = None
@@ -857,12 +803,16 @@ def random_vect_like(a):
     try:
         for i,bork in enumerate(b):
             if is_dict:
-                b[bork] = torch.randn_like(b[bork])
+                try:
+                    b[bork] = torch.randn_like(b[bork])
+                except TypeError:
+                    print('Bad value type in dict.')
+                    return None
             else:
                 b[i] = torch.randn_like(bork)
                 
     except TypeError:
-         b = torch.randn_like(a)
+         b = torch.randn_like(b)
            
     scalar_mult(b, 1.0/torch.sqrt(dot_vect(b,b)))
     
