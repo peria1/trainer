@@ -78,7 +78,8 @@ class trainer():
         trainee = trainee_class(self.problem).to(self.device)
         self.model = trainee # a trainee needs an optimzer and a criterion, 
                                            #   as well as a way to generate data.
-
+        self.model.trainer = self
+        
         self.model.to(self.device)
         if viewer:
             self.viewer = viewer
