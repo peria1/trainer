@@ -304,6 +304,9 @@ def crude_curl(x,y):
     return (dxdy - dydx)[1:-1,1:-1] 
 
 
+# def ecdf(arr): 
+#     plt.step(np.sort(arr), np.linspace(0, 1, len(arr), endpoint=False),where='post')
+
 def ecdf(x):
     x = x.flatten()
     x = x[~np.isnan(x)]
