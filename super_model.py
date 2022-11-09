@@ -800,6 +800,10 @@ def project_vect(a,b): # I need to repeat some code here to avoid extra passes
     scalar_mult(c, adotb/bnormsq)
     return c
 
+def reject_vect(a,b): 
+    a_onto_b = project_vect(a,b)
+    return subtract_vect(a,a_onto_b)
+
 def random_vect_like(a):
     is_dict = isinstance(a, dict)
     b = copy.deepcopy(a) if is_dict else list(copy.deepcopy(a))
