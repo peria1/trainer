@@ -324,9 +324,12 @@ class SuperModel(nn.Module):
     def ext_eigen_H(self):
         pass
         
-    def max_eigen_H(self): # direction and max absolute eigenvalue 
-        v_dot_hessian = self.vH()
-            
+    def max_eigen_H(self, rand_init=True): # direction and max absolute eigenvalue 
+        if not rand_init:
+            v_dot_hessian = self.vH()
+        else:
+            v_dot_hessian = random_vect_like(self.default_v)
+                        
         vnext = copy.deepcopy(v_dot_hessian)
         count = 0
         while True:
@@ -799,7 +802,8 @@ def project_vect(a,b): # I need to repeat some code here to avoid extra passes
 
 def random_vect_like(a):
     is_dict = isinstance(a, dict)
-    b = copy.deepcopy(a)
+    b = copy.deepcopy(a) if is_dict else list(copy.deepcopy(a))
+   
     try:
         for i,bork in enumerate(b):
             if is_dict:
@@ -810,14 +814,13 @@ def random_vect_like(a):
                     return None
             else:
                 b[i] = torch.randn_like(bork)
-                
+   
     except TypeError:
          b = torch.randn_like(b)
-           
+   
     scalar_mult(b, 1.0/torch.sqrt(dot_vect(b,b)))
-    
-    return b
- 
+   
+    return b if is_dict else tuple(b)
 
 if __name__ == "__main__":
     
